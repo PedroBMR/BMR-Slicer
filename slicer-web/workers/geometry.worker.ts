@@ -36,7 +36,7 @@ export interface GenerateLayersResponse {
   }>;
 }
 
-function toGeometry(payload: SliceWorkerRequest): BufferGeometry {
+function toGeometry(payload: SliceWorkerRequest | GenerateLayersRequest): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(payload.positions), 3));
   if (payload.indices) {

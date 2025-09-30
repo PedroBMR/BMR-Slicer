@@ -89,7 +89,7 @@ export function toXlsxBlob(summary: EstimateSummary): Blob {
   const workbook = createWorkbook(summary);
   const arrayBuffer = write(workbook, { type: 'array', bookType: 'xlsx' });
   const buffer = toUint8Array(arrayBuffer as ArrayBuffer | Uint8Array | number[]);
-  return new Blob([buffer], {
+  return new Blob([buffer as BlobPart], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 }
@@ -144,7 +144,7 @@ export function toPdfBlob(summary: EstimateSummary): Blob {
 
   const arrayBuffer = doc.output('arraybuffer');
   const buffer = toUint8Array(arrayBuffer as ArrayBuffer | Uint8Array | number[]);
-  return new Blob([buffer], { type: 'application/pdf' });
+  return new Blob([buffer as BlobPart], { type: 'application/pdf' });
 }
 
 export function downloadBlob(blob: Blob, fileName: string) {

@@ -9,7 +9,7 @@ import { createViewer, type ViewerContext } from '../modules/viewer';
 export function ViewerCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const geometry = useViewerStore((state) => state.geometry);
-  const layers = useViewerStore((state) => state.layers);
+  const layers = useViewerStore((state) => state.layers) as LayerEstimate[];
   const [selectedLayer, setSelectedLayer] = useState<number>(0);
 
   const viewerRef = useRef<ViewerContext | null>(null);
@@ -80,7 +80,7 @@ export function ViewerCanvas() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
             {layers.map((layer, index) => (
               <LayerRow
-                key={layer.elevation}
+                key={`${layer.elevation}-${index}`}
                 layer={layer}
                 index={index}
                 active={index === selectedLayer}
