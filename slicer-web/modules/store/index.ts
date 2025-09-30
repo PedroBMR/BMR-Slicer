@@ -26,11 +26,12 @@ export interface ViewerStoreState {
   fileName?: string;
   history: EstimateRecord[];
   geometryPayload?: GeometryPayload;
+  geometrySource?: ArrayBuffer | File;
 }
 
 export interface ViewerStoreActions {
   loadFile: (file: File) => Promise<void>;
-  setGeometry: (geometry: BufferGeometry, fileName?: string) => Promise<void>;
+  setGeometry: (geometry: BufferGeometry, fileName?: string, source?: ArrayBuffer | File) => Promise<void>;
   setParameters: (parameters: Partial<EstimateParameters>) => Promise<void>;
   recompute: () => Promise<void>;
   reset: () => void;
@@ -45,12 +46,13 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   parameters: DEFAULT_PARAMETERS,
   loading: false,
   history: [],
+  geometrySource: undefined,
 
   async loadFile(file: File) {
     set({ loading: true, error: undefined });
     try {
       const geometry = await loadGeometryFromFile(file);
-      await get().setGeometry(geometry, file.name);
+      await get().setGeometry(geometry, file.name, file);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ error: message });
@@ -59,7 +61,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     }
   },
 
-  async setGeometry(geometry: BufferGeometry, fileName?: string) {
+  async setGeometry(geometry: BufferGeometry, fileName?: string, source?: ArrayBuffer | File) {
     const positionAttribute = geometry.getAttribute('position');
     if (!positionAttribute) {
       set({ error: 'Geometry is missing position data.' });
@@ -70,7 +72,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     const index = geometry.getIndex();
     const indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
 
-    set({ geometry, fileName, geometryPayload: { positions, indices }, layers: [], summary: undefined });
+    set({
+      geometry,
+      fileName,
+      geometryPayload: { positions, indices },
+      geometrySource: source,
+      layers: [],
+      summary: undefined
+    });
     await get().recompute();
 
     const summary = get().summary;
@@ -181,7 +190,8 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       layers: [],
       summary: undefined,
       fileName: undefined,
-      geometryPayload: undefined
+      geometryPayload: undefined,
+      geometrySource: undefined
     });
   },
 
