@@ -1,28 +1,49 @@
 import { BufferGeometry, Vector3 } from 'three';
+import { z } from 'zod';
 
-import { SliceSummary, sliceGeometry } from '../geometry';
+import { sliceGeometry } from '../geometry';
 
-export interface EstimateParameters {
-  layerHeight: number; // millimetres
-  resinDensity: number; // g/ml
-  resinCostPerLiter: number; // currency per litre
-  exposureTimeSeconds: number;
-  liftDistance: number; // mm
-  liftSpeed: number; // mm/min
-}
+const Vector3Schema = z.instanceof(Vector3);
 
-export interface LayerEstimate extends SliceSummary {
-  elevation: number;
-  circumference: number;
-}
+const SliceSegmentSchema = z.object({
+  start: Vector3Schema,
+  end: Vector3Schema
+});
 
-export interface EstimateSummary {
-  layers: LayerEstimate[];
-  volume: number; // cubic millimetres
-  mass: number; // grams
-  resinCost: number; // currency
-  durationMinutes: number;
-}
+const SliceSummarySchema = z.object({
+  segments: z.array(SliceSegmentSchema),
+  centroid: Vector3Schema,
+  area: z.number().nonnegative(),
+  boundingRadius: z.number().nonnegative()
+});
+
+export const EstimateParametersSchema = z.object({
+  layerHeight: z.number().positive(),
+  resinDensity: z.number().positive(),
+  resinCostPerLiter: z.number().nonnegative(),
+  exposureTimeSeconds: z.number().nonnegative(),
+  liftDistance: z.number().nonnegative(),
+  liftSpeed: z.number().positive()
+});
+
+export const LayerEstimateSchema = SliceSummarySchema.extend({
+  elevation: z.number().nonnegative(),
+  circumference: z.number().nonnegative()
+});
+
+export const EstimateSummarySchema = z.object({
+  layers: z.array(LayerEstimateSchema),
+  volume: z.number().nonnegative(),
+  mass: z.number().nonnegative(),
+  resinCost: z.number().nonnegative(),
+  durationMinutes: z.number().nonnegative()
+});
+
+const LayerEstimateArraySchema = z.array(LayerEstimateSchema);
+
+export type EstimateParameters = z.infer<typeof EstimateParametersSchema>;
+export type LayerEstimate = z.infer<typeof LayerEstimateSchema>;
+export type EstimateSummary = z.infer<typeof EstimateSummarySchema>;
 
 export const DEFAULT_PARAMETERS: EstimateParameters = {
   layerHeight: 0.05,
@@ -34,22 +55,28 @@ export const DEFAULT_PARAMETERS: EstimateParameters = {
 };
 
 export function integrateLayers(layers: LayerEstimate[], parameters = DEFAULT_PARAMETERS): EstimateSummary {
-  const volume = layers.reduce((acc, layer) => acc + layer.area * parameters.layerHeight, 0);
+  const safeParameters = EstimateParametersSchema.parse(parameters);
+  const safeLayers = LayerEstimateArraySchema.parse(layers);
+
+  const volume = safeLayers.reduce(
+    (acc, layer) => acc + layer.area * safeParameters.layerHeight,
+    0
+  );
   const volumeMl = volume * 0.001;
-  const mass = volumeMl * parameters.resinDensity;
-  const resinCost = (volumeMl / 1000) * parameters.resinCostPerLiter;
+  const mass = volumeMl * safeParameters.resinDensity;
+  const resinCost = (volumeMl / 1000) * safeParameters.resinCostPerLiter;
 
-  const liftDurationPerLayer = parameters.liftDistance / parameters.liftSpeed;
+  const liftDurationPerLayer = safeParameters.liftDistance / safeParameters.liftSpeed;
   const durationMinutes =
-    (layers.length * (parameters.exposureTimeSeconds / 60 + liftDurationPerLayer)) || 0;
+    (safeLayers.length * (safeParameters.exposureTimeSeconds / 60 + liftDurationPerLayer)) || 0;
 
-  return {
-    layers,
+  return EstimateSummarySchema.parse({
+    layers: safeLayers,
     volume,
     mass,
     resinCost,
     durationMinutes
-  };
+  });
 }
 
 export interface LayerGenerationOptions {
@@ -61,7 +88,7 @@ export function generateLayers(
   geometry: BufferGeometry,
   options: LayerGenerationOptions = {}
 ): LayerEstimate[] {
-  const parameters = options.parameters ?? DEFAULT_PARAMETERS;
+  const parameters = EstimateParametersSchema.parse(options.parameters ?? DEFAULT_PARAMETERS);
   const orientation = options.orientation?.clone().normalize() ?? new Vector3(0, 0, 1);
 
   geometry.computeBoundingBox();
@@ -96,13 +123,14 @@ export function generateLayers(
     });
   }
 
-  return layers;
+  return LayerEstimateArraySchema.parse(layers);
 }
 
 export function estimatePrint(
   geometry: BufferGeometry,
   options: LayerGenerationOptions = {}
 ): EstimateSummary {
-  const layers = generateLayers(geometry, options);
-  return integrateLayers(layers, options.parameters);
+  const parameters = options.parameters ?? DEFAULT_PARAMETERS;
+  const layers = generateLayers(geometry, { ...options, parameters });
+  return integrateLayers(layers, parameters);
 }

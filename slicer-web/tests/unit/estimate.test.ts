@@ -1,7 +1,14 @@
 import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { describe, expect, it } from 'vitest';
+import { ZodError } from 'zod';
 
-import { DEFAULT_PARAMETERS, estimatePrint, generateLayers } from '../../modules/estimate';
+import {
+  DEFAULT_PARAMETERS,
+  estimatePrint,
+  generateLayers,
+  integrateLayers,
+  type EstimateParameters
+} from '../../modules/estimate';
 
 function createCube(size = 1) {
   const half = size / 2;
@@ -45,5 +52,30 @@ describe('estimate module', () => {
     expect(summary.layers.length).toBeGreaterThan(0);
     expect(summary.volume).toBeGreaterThan(0);
     expect(summary.mass).toBeGreaterThan(0);
+  });
+
+  it('throws when parameters are invalid', () => {
+    const geometry = createCube(10);
+    const invalidParameters = {
+      ...DEFAULT_PARAMETERS,
+      layerHeight: -1
+    } as unknown as EstimateParameters;
+
+    expect(() => generateLayers(geometry, { parameters: invalidParameters })).toThrowError(ZodError);
+  });
+
+  it('throws when layer data fails validation', () => {
+    const geometry = createCube(10);
+    const layers = generateLayers(geometry, { parameters: { ...DEFAULT_PARAMETERS, layerHeight: 1 } });
+    const invalidLayers = layers.map((layer, index) =>
+      index === 0
+        ? {
+            ...layer,
+            area: -1
+          }
+        : layer
+    );
+
+    expect(() => integrateLayers(invalidLayers, DEFAULT_PARAMETERS)).toThrowError(ZodError);
   });
 });
