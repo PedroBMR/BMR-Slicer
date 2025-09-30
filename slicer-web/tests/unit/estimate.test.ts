@@ -1,4 +1,4 @@
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 
@@ -44,6 +44,19 @@ describe('estimate module', () => {
     expect(layers.length).toBeGreaterThan(0);
     const centroids = layers.map((layer) => layer.centroid.length());
     expect(Math.max(...centroids)).toBeGreaterThan(0);
+  });
+
+  it('generates layers for orientations with negative components', () => {
+    const geometry = createCube(10);
+    const orientation = new Vector3(1, -1, 0).normalize();
+    const layers = generateLayers(geometry, {
+      orientation,
+      parameters: { ...DEFAULT_PARAMETERS, layerHeight: 1 }
+    });
+
+    expect(layers.length).toBeGreaterThan(10);
+    const elevations = layers.map((layer) => layer.elevation);
+    expect(Math.max(...elevations)).toBeGreaterThan(10);
   });
 
   it('estimates print metrics with reasonable numbers', () => {
