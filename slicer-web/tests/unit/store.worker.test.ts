@@ -66,6 +66,7 @@ describe('useViewerStore worker integration', () => {
       fileName: undefined,
       history: [],
       geometryPayload: undefined,
+      geometrySource: undefined,
       loadFile: useViewerStore.getState().loadFile,
       setGeometry: useViewerStore.getState().setGeometry,
       setParameters: useViewerStore.getState().setParameters,
