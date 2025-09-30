@@ -2,6 +2,7 @@ import { expose } from 'comlink';
 import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
 
 import { sliceGeometry } from '../modules/geometry';
+import { generateLayers, type EstimateParameters } from '../modules/estimate';
 
 export interface SliceWorkerRequest {
   positions: ArrayBuffer;
@@ -16,6 +17,23 @@ export interface SliceWorkerResponse {
   centroid: [number, number, number];
   area: number;
   boundingRadius: number;
+}
+
+export interface GenerateLayersRequest {
+  positions: ArrayBuffer;
+  indices?: ArrayBuffer;
+  parameters: EstimateParameters;
+}
+
+export interface GenerateLayersResponse {
+  layers: Array<{
+    elevation: number;
+    area: number;
+    circumference: number;
+    boundingRadius: number;
+    centroid: [number, number, number];
+    segments: Array<{ start: [number, number, number]; end: [number, number, number] }>;
+  }>;
 }
 
 function toGeometry(payload: SliceWorkerRequest): BufferGeometry {
@@ -44,6 +62,24 @@ const api = {
       centroid: summary.centroid.toArray() as [number, number, number],
       area: summary.area,
       boundingRadius: summary.boundingRadius
+    };
+  },
+  generateLayers(payload: GenerateLayersRequest): GenerateLayersResponse {
+    const geometry = toGeometry(payload);
+    const layers = generateLayers(geometry, { parameters: payload.parameters });
+
+    return {
+      layers: layers.map((layer) => ({
+        elevation: layer.elevation,
+        area: layer.area,
+        circumference: layer.circumference,
+        boundingRadius: layer.boundingRadius,
+        centroid: layer.centroid.toArray() as [number, number, number],
+        segments: layer.segments.map((segment) => ({
+          start: segment.start.toArray() as [number, number, number],
+          end: segment.end.toArray() as [number, number, number]
+        }))
+      }))
     };
   }
 };

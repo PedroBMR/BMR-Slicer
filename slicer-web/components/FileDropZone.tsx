@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useViewerStore } from '../modules/store';
 
@@ -8,6 +8,7 @@ export function FileDropZone() {
   const loadFile = useViewerStore((state) => state.loadFile);
   const loading = useViewerStore((state) => state.loading);
   const error = useViewerStore((state) => state.error);
+  const disposeWorkers = useViewerStore((state) => state.disposeWorkers);
   const [highlighted, setHighlighted] = useState(false);
 
   const handleFiles = useCallback(
@@ -19,6 +20,12 @@ export function FileDropZone() {
     },
     [loadFile]
   );
+
+  useEffect(() => {
+    return () => {
+      disposeWorkers();
+    };
+  }, [disposeWorkers]);
 
   return (
     <div
