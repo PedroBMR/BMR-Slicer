@@ -150,13 +150,41 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
 
   let area = 0;
   if (projected.length >= 3) {
-    const unique = projected.slice(0, 64); // clamp to avoid runaway memory
-    for (let i = 0; i < unique.length; i++) {
-      const [x1, y1] = unique[i];
-      const [x2, y2] = unique[(i + 1) % unique.length];
-      area += x1 * y2 - x2 * y1;
+    const precisionFactor = 1e6;
+    const uniqueMap = new Map<string, [number, number]>();
+    for (const [x, y] of projected) {
+      const key = `${Math.round(x * precisionFactor)}:${Math.round(y * precisionFactor)}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, [x, y]);
+      }
     }
-    area = Math.abs(area) * 0.5;
+
+    const unique = Array.from(uniqueMap.values());
+    if (unique.length >= 3) {
+      const centroid2D = unique.reduce(
+        (acc, [x, y]) => {
+          acc.x += x;
+          acc.y += y;
+          return acc;
+        },
+        { x: 0, y: 0 }
+      );
+      centroid2D.x /= unique.length;
+      centroid2D.y /= unique.length;
+
+      unique.sort((a, b) => {
+        const angleA = Math.atan2(a[1] - centroid2D.y, a[0] - centroid2D.x);
+        const angleB = Math.atan2(b[1] - centroid2D.y, b[0] - centroid2D.x);
+        return angleA - angleB;
+      });
+
+      for (let i = 0; i < unique.length; i++) {
+        const [x1, y1] = unique[i];
+        const [x2, y2] = unique[(i + 1) % unique.length];
+        area += x1 * y2 - x2 * y1;
+      }
+      area = Math.abs(area) * 0.5;
+    }
   }
 
   const boundingRadius = intersections.reduce((radius, point) => {
