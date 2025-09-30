@@ -136,7 +136,7 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
       intersections.push(...localPoints.map((p) => p.clone()));
       ensureBasis();
       projected.push(
-        ...localPoints.map((p) => {
+        ...localPoints.map<[number, number]>((p) => {
           const relative = p.clone().sub(origin);
           return [relative.dot(basisU), relative.dot(basisV)];
         })

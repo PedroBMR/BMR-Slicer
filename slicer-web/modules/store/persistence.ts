@@ -58,7 +58,7 @@ export function saveEstimate(record: EstimateRecord) {
   if (!db) {
     return Promise.resolve(undefined);
   }
-  return db.estimates.add(parsedRecord);
+  return db.estimates.add(parsedRecord as EstimateRecord);
 }
 
 export async function loadRecentEstimates(limit = 5) {

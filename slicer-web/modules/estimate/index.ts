@@ -5,10 +5,22 @@ import { sliceGeometry } from '../geometry';
 
 const Vector3Schema = z.instanceof(Vector3);
 
+export interface SliceSegment {
+  start: Vector3;
+  end: Vector3;
+}
+
 const SliceSegmentSchema = z.object({
   start: Vector3Schema,
   end: Vector3Schema
 });
+
+export interface SliceSummary {
+  segments: SliceSegment[];
+  centroid: Vector3;
+  area: number;
+  boundingRadius: number;
+}
 
 const SliceSummarySchema = z.object({
   segments: z.array(SliceSegmentSchema),
@@ -26,10 +38,23 @@ export const EstimateParametersSchema = z.object({
   liftSpeed: z.number().positive()
 });
 
+export interface LayerEstimate extends SliceSummary {
+  elevation: number;
+  circumference: number;
+}
+
 export const LayerEstimateSchema = SliceSummarySchema.extend({
   elevation: z.number().nonnegative(),
   circumference: z.number().nonnegative()
 });
+
+export interface EstimateSummary {
+  layers: LayerEstimate[];
+  volume: number;
+  mass: number;
+  resinCost: number;
+  durationMinutes: number;
+}
 
 export const EstimateSummarySchema = z.object({
   layers: z.array(LayerEstimateSchema),
@@ -42,8 +67,6 @@ export const EstimateSummarySchema = z.object({
 const LayerEstimateArraySchema = z.array(LayerEstimateSchema);
 
 export type EstimateParameters = z.infer<typeof EstimateParametersSchema>;
-export type LayerEstimate = z.infer<typeof LayerEstimateSchema>;
-export type EstimateSummary = z.infer<typeof EstimateSummarySchema>;
 
 export const DEFAULT_PARAMETERS: EstimateParameters = {
   layerHeight: 0.05,
@@ -56,7 +79,7 @@ export const DEFAULT_PARAMETERS: EstimateParameters = {
 
 export function integrateLayers(layers: LayerEstimate[], parameters = DEFAULT_PARAMETERS): EstimateSummary {
   const safeParameters = EstimateParametersSchema.parse(parameters);
-  const safeLayers = LayerEstimateArraySchema.parse(layers);
+  const safeLayers = LayerEstimateArraySchema.parse(layers) as LayerEstimate[];
 
   const volume = safeLayers.reduce(
     (acc, layer) => acc + layer.area * safeParameters.layerHeight,
@@ -76,7 +99,7 @@ export function integrateLayers(layers: LayerEstimate[], parameters = DEFAULT_PA
     mass,
     resinCost,
     durationMinutes
-  });
+  }) as EstimateSummary;
 }
 
 export interface LayerGenerationOptions {
@@ -123,7 +146,7 @@ export function generateLayers(
     });
   }
 
-  return LayerEstimateArraySchema.parse(layers);
+  return LayerEstimateArraySchema.parse(layers) as LayerEstimate[];
 }
 
 export function estimatePrint(

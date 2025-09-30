@@ -62,9 +62,22 @@ viewer, explore generated layers, and export reports.
 | `pnpm type-check`    | Execute TypeScript project checks                   |
 | `pnpm test`          | Run Vitest unit tests (jsdom environment)           |
 | `pnpm coverage`      | Generate coverage reports via Vitest                |
-| `pnpm e2e`           | Launch Playwright tests (starts dev server)         |
+| `pnpm e2e`           | Build the app and launch Playwright tests           |
 | `pnpm format`        | Format files with Prettier                          |
 | `pnpm release`       | Trigger release-please for changelog automation     |
+
+## Offline experience
+
+Building the project (`pnpm build`) generates a production service worker via `next-pwa`. When the
+app is served (`pnpm start`), the worker precaches the application shell and uses runtime caching
+strategies to keep geometry assets available offline (`CacheFirst`) and fall back to cached API
+responses when the network is unreachable (`NetworkFirst`). After visiting a page once, you can
+toggle your browser offline and refresh to keep interacting with the viewer UI and previously
+fetched data.
+
+The Playwright suite includes an offline smoke test that loads the home page, waits for the service
+worker to take control, and then reloads the page with `page.context().setOffline(true)` to confirm
+the cached shell renders as expected.
 
 ## Testing
 

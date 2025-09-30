@@ -1,10 +1,11 @@
 'use client';
 
 import { EstimateSummary } from '../../components/EstimateSummary';
+import type { LayerEstimate } from '../../modules/estimate';
 import { useViewerStore } from '../../modules/store';
 
 export default function EstimatesPage() {
-  const layers = useViewerStore((state) => state.layers);
+  const layers = useViewerStore((state) => state.layers) as LayerEstimate[];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -32,7 +33,10 @@ export default function EstimatesPage() {
               </thead>
               <tbody>
                 {layers.map((layer, index) => (
-                  <tr key={layer.elevation} style={{ borderTop: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                  <tr
+                    key={`${layer.elevation}-${index}`}
+                    style={{ borderTop: '1px solid rgba(148, 163, 184, 0.2)' }}
+                  >
                     <td style={{ padding: '0.75rem 0.5rem' }}>{index + 1}</td>
                     <td style={{ padding: '0.75rem 0.5rem' }}>{layer.elevation.toFixed(2)}</td>
                     <td style={{ padding: '0.75rem 0.5rem' }}>{layer.area.toFixed(2)}</td>

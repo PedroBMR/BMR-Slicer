@@ -132,14 +132,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       const parameters = get().parameters;
 
       const geometryResponsePromise = getGeometryWorkerHandle().proxy.generateLayers({
-        positions: payload.positions.buffer.slice(0),
-        indices: payload.indices ? payload.indices.buffer.slice(0) : undefined,
+        positions: payload.positions.buffer.slice(0) as ArrayBuffer,
+        indices: payload.indices ? (payload.indices.buffer.slice(0) as ArrayBuffer) : undefined,
         parameters
       });
 
       const estimateResponsePromise = getEstimateWorkerHandle().proxy.estimate({
-        positions: payload.positions.buffer.slice(0),
-        indices: payload.indices ? payload.indices.buffer.slice(0) : undefined,
+        positions: payload.positions.buffer.slice(0) as ArrayBuffer,
+        indices: payload.indices ? (payload.indices.buffer.slice(0) as ArrayBuffer) : undefined,
         parameters
       });
 
