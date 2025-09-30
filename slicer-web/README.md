@@ -14,7 +14,8 @@ responsive preview of print-ready layers.
 - 🧠 **Stateful viewer** – manage uploaded meshes, layer selections, and export flows with a typed
   Zustand store.
 - 📦 **Report exports** – download JSON + CSV summaries for sharing or archival.
-- 🧵 **Worker offloading** – structure Comlink workers for geometry and estimation pipelines.
+- 🧵 **Worker offloading** – lightweight clients route geometry slicing and estimation through
+  dedicated Comlink workers to keep the UI responsive.
 - 🧪 **Testing-ready** – Vitest unit suite and Playwright smoke tests with scripts wired to pnpm.
 
 ## Project structure
@@ -67,9 +68,11 @@ viewer, explore generated layers, and export reports.
 
 ## Testing
 
-Unit tests live under `tests/` and are powered by Vitest with jsdom. End-to-end smoke checks reside
-in `e2e/` and are executed by Playwright using the same pnpm workspace scripts. Configure
-`PLAYWRIGHT_BASE_URL` to point at a deployed environment when running against staging.
+Unit tests live under `tests/` and are powered by Vitest with jsdom. Worker-facing modules are
+covered with proxy stubs to ensure the Zustand store delegates geometry + estimation work to the
+background threads. End-to-end smoke checks reside in `e2e/` and are executed by Playwright using
+the same pnpm workspace scripts. Configure `PLAYWRIGHT_BASE_URL` to point at a deployed environment
+when running against staging.
 
 ## Tooling highlights
 
