@@ -2,7 +2,11 @@
 
 import { useMemo } from 'react';
 
-import { exportSummary } from '../modules/export';
+import {
+  exportSummary,
+  exportSummaryAsPdf,
+  exportSummaryAsXlsx
+} from '../modules/export';
 import { useViewerStore } from '../modules/store';
 
 export function EstimateSummary() {
@@ -55,20 +59,50 @@ export function EstimateSummary() {
           <h2 style={{ margin: 0 }}>Print estimate</h2>
           <p style={{ margin: 0, color: '#94a3b8' }}>Computed using adaptive slicing heuristics.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => exportSummary({ fileName, summary })}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '9999px',
-            border: 'none',
-            background: '#38bdf8',
-            color: '#0f172a',
-            fontWeight: 600
-          }}
-        >
-          Export report
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => exportSummary({ fileName, summary })}
+            style={{
+              padding: '0.75rem 1.5rem',
+              borderRadius: '9999px',
+              border: 'none',
+              background: '#38bdf8',
+              color: '#0f172a',
+              fontWeight: 600
+            }}
+          >
+            Export JSON & CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportSummaryAsXlsx({ fileName, summary })}
+            style={{
+              padding: '0.75rem 1.5rem',
+              borderRadius: '9999px',
+              border: '1px solid rgba(148, 163, 184, 0.4)',
+              background: 'transparent',
+              color: '#f8fafc',
+              fontWeight: 600
+            }}
+          >
+            Download XLSX
+          </button>
+          <button
+            type="button"
+            onClick={() => exportSummaryAsPdf({ fileName, summary })}
+            style={{
+              padding: '0.75rem 1.5rem',
+              borderRadius: '9999px',
+              border: '1px solid rgba(148, 163, 184, 0.4)',
+              background: 'transparent',
+              color: '#f8fafc',
+              fontWeight: 600
+            }}
+          >
+            Download PDF
+          </button>
+        </div>
       </header>
       <dl
         style={{
