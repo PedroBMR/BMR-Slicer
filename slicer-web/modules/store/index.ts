@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { BufferGeometry, Vector3 } from 'three';
+import { ZodError } from 'zod';
 
 import type { EstimateParameters, EstimateSummary, LayerEstimate } from '../estimate';
 import { DEFAULT_PARAMETERS } from '../estimate';
@@ -74,7 +75,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
     const summary = get().summary;
     if (summary) {
-      const operation = saveEstimate({
+      const record = {
         fileName: fileName ?? 'untitled-mesh',
         createdAt: new Date().toISOString(),
         summary: {
@@ -84,9 +85,29 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
           durationMinutes: summary.durationMinutes,
           layers: summary.layers.length
         }
-      });
-      if (operation) {
-        void operation.then(() => get().refreshHistory());
+      } satisfies EstimateRecord;
+
+      const handlePersistenceError = (error: unknown) => {
+        const message =
+          error instanceof ZodError
+            ? 'Failed to save estimate history: invalid estimate record.'
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error';
+        set({ error: message });
+      };
+
+      try {
+        const operation = saveEstimate(record);
+        if (operation) {
+          void operation
+            .then(() => get().refreshHistory())
+            .catch((error) => {
+              handlePersistenceError(error);
+            });
+        }
+      } catch (error) {
+        handlePersistenceError(error);
       }
     }
   },

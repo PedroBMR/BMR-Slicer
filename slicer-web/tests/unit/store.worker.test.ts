@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { ZodError } from 'zod';
 
 import { DEFAULT_PARAMETERS } from '../../modules/estimate';
 import { useViewerStore } from '../../modules/store';
@@ -37,9 +38,14 @@ vi.mock('../../modules/geometry', async () => {
   };
 });
 
+const { saveEstimateMock, loadRecentEstimatesMock } = vi.hoisted(() => ({
+  saveEstimateMock: vi.fn().mockResolvedValue(undefined),
+  loadRecentEstimatesMock: vi.fn().mockResolvedValue([])
+}));
+
 vi.mock('../../modules/store/persistence', () => ({
-  saveEstimate: vi.fn().mockResolvedValue(undefined),
-  loadRecentEstimates: vi.fn().mockResolvedValue([])
+  saveEstimate: saveEstimateMock,
+  loadRecentEstimates: loadRecentEstimatesMock
 }));
 
 describe('useViewerStore worker integration', () => {
@@ -48,6 +54,8 @@ describe('useViewerStore worker integration', () => {
     generateLayersMock.mockReset();
     estimateMock.mockReset();
     loadGeometryFromFileMock?.mockReset();
+    saveEstimateMock.mockReset();
+    loadRecentEstimatesMock.mockReset();
     useViewerStore.setState({
       geometry: undefined,
       layers: [],
@@ -118,5 +126,52 @@ describe('useViewerStore worker integration', () => {
     const state = useViewerStore.getState();
     expect(state.layers).toHaveLength(1);
     expect(state.summary?.volume).toBe(1);
+  });
+
+  it('captures validation errors when persistence rejects', async () => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new Float32BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3)
+    );
+
+    loadGeometryFromFileMock!.mockResolvedValue(geometry);
+    generateLayersMock.mockResolvedValue({
+      layers: [
+        {
+          elevation: 0,
+          area: 1,
+          circumference: 2,
+          boundingRadius: 3,
+          centroid: [0, 0, 0] as [number, number, number],
+          segments: [
+            {
+              start: [0, 0, 0] as [number, number, number],
+              end: [1, 0, 0] as [number, number, number]
+            }
+          ]
+        }
+      ]
+    });
+    estimateMock.mockResolvedValue({
+      summary: {
+        volume: 1,
+        mass: 2,
+        resinCost: 3,
+        durationMinutes: 4,
+        layers: 1
+      },
+      layers: []
+    });
+
+    const error = new ZodError([]);
+    saveEstimateMock.mockRejectedValueOnce(error);
+
+    const file = new File([new ArrayBuffer(8)], 'cube.stl', { type: 'model/stl' });
+    await useViewerStore.getState().loadFile(file);
+
+    await vi.waitFor(() => {
+      expect(useViewerStore.getState().error).toContain('Failed to save estimate history');
+    });
   });
 });

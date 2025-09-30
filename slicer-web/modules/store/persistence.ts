@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { z } from 'zod';
 
 export interface EstimateRecord {
   id?: number;
@@ -12,6 +13,21 @@ export interface EstimateRecord {
     layers: number;
   };
 }
+
+export const EstimateRecordSchema = z.object({
+  id: z.number().int().nonnegative().optional(),
+  fileName: z.string().min(1),
+  createdAt: z
+    .string()
+    .refine((value) => !Number.isNaN(Date.parse(value)), { message: 'createdAt must be an ISO date' }),
+  summary: z.object({
+    volume: z.number().nonnegative(),
+    mass: z.number().nonnegative(),
+    resinCost: z.number().nonnegative(),
+    durationMinutes: z.number().nonnegative(),
+    layers: z.number().int().nonnegative()
+  })
+});
 
 class SlicerDatabase extends Dexie {
   estimates!: Table<EstimateRecord>;
@@ -36,12 +52,13 @@ function getDatabase() {
   return database;
 }
 
-export async function saveEstimate(record: EstimateRecord) {
+export function saveEstimate(record: EstimateRecord) {
+  const parsedRecord = EstimateRecordSchema.parse(record);
   const db = getDatabase();
   if (!db) {
-    return undefined;
+    return Promise.resolve(undefined);
   }
-  return db.estimates.add(record);
+  return db.estimates.add(parsedRecord);
 }
 
 export async function loadRecentEstimates(limit = 5) {
