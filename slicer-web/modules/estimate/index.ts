@@ -122,18 +122,24 @@ export function generateLayers(
 
   const min = bounds.min.clone();
   const max = bounds.max.clone();
-  const heightVector = max.clone().sub(min);
-  const totalHeight = Math.abs(heightVector.dot(orientation));
+  const extents = max.clone().sub(min);
+  const orientationAbs = new Vector3(Math.abs(orientation.x), Math.abs(orientation.y), Math.abs(orientation.z));
+  const totalHeight = orientationAbs.dot(extents);
 
   const layerCount = Math.max(1, Math.ceil(totalHeight / parameters.layerHeight));
   const origin = new Vector3();
+  const startCorner = new Vector3(
+    orientation.x >= 0 ? min.x : max.x,
+    orientation.y >= 0 ? min.y : max.y,
+    orientation.z >= 0 ? min.z : max.z
+  );
   const normal = orientation.clone();
 
   const layers: LayerEstimate[] = [];
 
   for (let index = 0; index < layerCount; index++) {
     const distance = parameters.layerHeight * index;
-    origin.copy(min).addScaledVector(orientation, distance);
+    origin.copy(startCorner).addScaledVector(normal, distance);
     const summary = sliceGeometry(geometry, { origin, normal, thickness: parameters.layerHeight });
     const circumference = summary.segments.reduce((acc, segment) => {
       return acc + segment.start.distanceTo(segment.end);
