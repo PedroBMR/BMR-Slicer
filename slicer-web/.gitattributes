@@ -1,1 +1,2 @@
+# Treat STL assets as text to preserve ASCII formatting
 *.stl text
