@@ -7,6 +7,7 @@ import {
   Float32BufferAttribute,
   Line,
   LineBasicMaterial,
+  Material,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -50,6 +51,15 @@ export function createViewer(canvas: HTMLCanvasElement): ViewerContext {
   let mesh: Mesh | undefined;
   let sliceLine: Line | undefined;
 
+  const disposeMaterial = (material: Material | Material[] | undefined) => {
+    if (!material) return;
+    if (Array.isArray(material)) {
+      material.forEach(disposeMaterial);
+      return;
+    }
+    material.dispose();
+  };
+
   function render() {
     controls.update();
     renderer.render(scene, camera);
@@ -59,7 +69,7 @@ export function createViewer(canvas: HTMLCanvasElement): ViewerContext {
     if (mesh) {
       scene.remove(mesh);
       mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+      disposeMaterial(mesh.material);
       mesh = undefined;
     }
 
@@ -120,7 +130,7 @@ export function createViewer(canvas: HTMLCanvasElement): ViewerContext {
     renderer.dispose();
     if (mesh) {
       mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+      disposeMaterial(mesh.material);
     }
     if (sliceLine) {
       sliceLine.geometry.dispose();
