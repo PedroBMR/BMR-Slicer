@@ -21,10 +21,12 @@
   "dependencies": {
     "comlink": "^4.4.1",
     "dexie": "^4.0.8",
+    "jspdf": "^2.5.2",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "three": "^0.170.0",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.1"
   },
   "devDependencies": {
