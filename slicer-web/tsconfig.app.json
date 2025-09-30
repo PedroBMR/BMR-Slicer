@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "types": ["node", "next", "next/types/global"],
+    "moduleResolution": "bundler"
+  },
+  "include": ["next-env.d.ts", "app", "components", "modules", "lib", "workers", "styles"],
+  "exclude": ["node_modules", "tests", "e2e", "dist"]
+}
