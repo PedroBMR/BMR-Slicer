@@ -2,9 +2,9 @@ module.exports = {
   root: true,
   extends: [
     'next/core-web-vitals',
-    'plugin:@typescript-eslint/recommended',
-    'plugin:jsx-a11y/recommended',
-    'plugin:import/recommended'
+    'plugin:import/recommended',
+    'plugin:import/typescript',
+    'plugin:prettier/recommended'
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
