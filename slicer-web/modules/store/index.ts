@@ -1,19 +1,21 @@
 'use client';
 
+import { transfer } from 'comlink';
 import { create } from 'zustand';
-import { BufferGeometry, Vector3 } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
 import { ZodError } from 'zod';
 
 import type { EstimateParameters, EstimateSummary, LayerEstimate } from '../estimate';
 import { DEFAULT_PARAMETERS } from '../estimate';
-import { loadGeometryFromFile } from '../geometry';
 import { getGeometryWorkerHandle, releaseGeometryWorker } from '../geometry/workerClient';
 import { getEstimateWorkerHandle, releaseEstimateWorker } from '../estimate/workerClient';
 import { loadRecentEstimates, saveEstimate, type EstimateRecord } from './persistence';
+import type { GeometryMetrics } from '../../workers/geometry.worker';
 
 interface GeometryPayload {
   positions: Float32Array;
   indices?: Uint32Array;
+  metrics?: GeometryMetrics;
 }
 
 export interface ViewerStoreState {
@@ -27,11 +29,18 @@ export interface ViewerStoreState {
   history: EstimateRecord[];
   geometryPayload?: GeometryPayload;
   geometrySource?: ArrayBuffer | File;
+  geometryMetrics?: GeometryMetrics;
+  geometryCenter?: Vector3;
 }
 
 export interface ViewerStoreActions {
   loadFile: (file: File) => Promise<void>;
-  setGeometry: (geometry: BufferGeometry, fileName?: string, source?: ArrayBuffer | File) => Promise<void>;
+  setGeometry: (
+    geometry: BufferGeometry,
+    fileName?: string,
+    source?: ArrayBuffer | File,
+    analysis?: GeometryPayload
+  ) => Promise<void>;
   setParameters: (parameters: Partial<EstimateParameters>) => Promise<void>;
   recompute: () => Promise<void>;
   reset: () => void;
@@ -47,12 +56,40 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   loading: false,
   history: [],
   geometrySource: undefined,
+  geometryMetrics: undefined,
+  geometryCenter: undefined,
 
   async loadFile(file: File) {
     set({ loading: true, error: undefined });
     try {
-      const geometry = await loadGeometryFromFile(file);
-      await get().setGeometry(geometry, file.name, file);
+      const buffer = await file.arrayBuffer();
+      const worker = getGeometryWorkerHandle();
+      const response = await worker.proxy.analyzeGeometry(
+        transfer(
+          {
+            buffer,
+            fileName: file.name,
+            mimeType: file.type
+          },
+          [buffer]
+        )
+      );
+
+      const positions = new Float32Array(response.positions);
+      const indices = response.indices ? new Uint32Array(response.indices) : undefined;
+
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+      if (indices) {
+        geometry.setIndex(new Uint32BufferAttribute(indices, 1));
+      }
+      geometry.computeVertexNormals();
+
+      await get().setGeometry(geometry, file.name, file, {
+        positions,
+        indices,
+        metrics: response.metrics
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ error: message });
@@ -61,21 +98,43 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     }
   },
 
-  async setGeometry(geometry: BufferGeometry, fileName?: string, source?: ArrayBuffer | File) {
-    const positionAttribute = geometry.getAttribute('position');
-    if (!positionAttribute) {
+  async setGeometry(
+    geometry: BufferGeometry,
+    fileName?: string,
+    source?: ArrayBuffer | File,
+    analysis?: GeometryPayload
+  ) {
+    let positions: Float32Array | undefined;
+    let indices: Uint32Array | undefined;
+    let metrics = analysis?.metrics;
+
+    if (analysis) {
+      positions = analysis.positions;
+      indices = analysis.indices;
+    } else {
+      const positionAttribute = geometry.getAttribute('position');
+      if (!positionAttribute) {
+        set({ error: 'Geometry is missing position data.' });
+        return;
+      }
+      positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
+      const index = geometry.getIndex();
+      indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
+    }
+
+    if (!positions) {
       set({ error: 'Geometry is missing position data.' });
       return;
     }
 
-    const positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
-    const index = geometry.getIndex();
-    const indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
+    const centerVector = metrics ? new Vector3(...metrics.center) : undefined;
 
     set({
       geometry,
       fileName,
-      geometryPayload: { positions, indices },
+      geometryPayload: { positions, indices, metrics },
+      geometryMetrics: metrics,
+      geometryCenter: centerVector,
       geometrySource: source,
       layers: [],
       summary: undefined
@@ -191,7 +250,9 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       summary: undefined,
       fileName: undefined,
       geometryPayload: undefined,
-      geometrySource: undefined
+      geometrySource: undefined,
+      geometryMetrics: undefined,
+      geometryCenter: undefined
     });
   },
 
