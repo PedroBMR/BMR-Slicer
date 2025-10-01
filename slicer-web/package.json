@@ -62,5 +62,13 @@
     "release-please": "^16.14.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.4"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "pnpm exec eslint --fix"
+    ],
+    "*.{ts,tsx,js,jsx,json,css,md}": [
+      "pnpm exec prettier --write"
+    ]
   }
 }
