@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { EstimateSummary } from '../components/EstimateSummary';
-import { FileDropZone } from '../components/FileDropZone';
+import { FileDrop } from '../components/FileDrop';
 import { HistoryTimeline } from '../components/HistoryTimeline';
 import { APP_NAME } from '../lib/config';
 
@@ -51,7 +51,7 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <FileDropZone />
+        <FileDrop />
       </section>
       <EstimateSummary />
       <HistoryTimeline />

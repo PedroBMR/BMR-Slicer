@@ -1,7 +1,14 @@
 import { expose } from 'comlink';
 import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
+import { BufferGeometryUtils, STLLoader, ThreeMFLoader } from 'three-stdlib';
 
-import { sliceGeometry } from '../modules/geometry';
+const THREE_MF_MIME_TYPES = new Set([
+  'model/3mf',
+  'application/vnd.ms-3mfdocument',
+  'application/vnd.ms-package.3dmanufacturing-3dmodel'
+]);
+
+import { getMeshStatistics, sliceGeometry } from '../modules/geometry';
 import { generateLayers, type EstimateParameters } from '../modules/estimate';
 
 export interface SliceWorkerRequest {
@@ -36,6 +43,90 @@ export interface GenerateLayersResponse {
   }>;
 }
 
+export interface ParseMeshRequest {
+  buffer: ArrayBuffer;
+  fileName: string;
+  mimeType?: string;
+}
+
+export interface ParseMeshResponse {
+  positions: Float32Array;
+  indices?: Uint32Array;
+  statistics: {
+    vertexCount: number;
+    faceCount: number;
+    boundingBox: { min: [number, number, number]; max: [number, number, number] };
+  };
+}
+
+function createGeometryFromLoader(buffer: ArrayBuffer, request: ParseMeshRequest): BufferGeometry {
+  const identifier = request.fileName.toLowerCase();
+  const signature = new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength));
+  const isThreeMF =
+    identifier.endsWith('.3mf') ||
+    (request.mimeType && THREE_MF_MIME_TYPES.has(request.mimeType)) ||
+    (signature.length === 4 &&
+      signature[0] === 0x50 &&
+      signature[1] === 0x4b &&
+      signature[2] === 0x03 &&
+      signature[3] === 0x04);
+
+  if (isThreeMF) {
+    const loader = new ThreeMFLoader();
+    const object = loader.parse(buffer);
+    const geometries: BufferGeometry[] = [];
+    object.traverse((child: unknown) => {
+      if ((child as { isMesh?: boolean; geometry?: BufferGeometry }).isMesh) {
+        const mesh = child as { geometry: BufferGeometry };
+        geometries.push(mesh.geometry.clone());
+      }
+    });
+
+    if (geometries.length > 0) {
+      const merged = geometries.length === 1
+        ? geometries[0]
+        : BufferGeometryUtils.mergeGeometries(geometries, true);
+      if (!merged) {
+        throw new Error('Unable to merge 3MF mesh data.');
+      }
+      merged.computeVertexNormals();
+      return merged;
+    }
+    throw new Error('Unable to parse 3MF file. No mesh data found.');
+  }
+
+  const loader = new STLLoader();
+  const geometry = loader.parse(buffer);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function toParseResponse(geometry: BufferGeometry): ParseMeshResponse {
+  const position = geometry.getAttribute('position');
+  if (!position) {
+    throw new Error('Geometry is missing position data.');
+  }
+
+  const positions = new Float32Array(position.array as ArrayLike<number>);
+  const index = geometry.getIndex();
+  const indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
+
+  const stats = getMeshStatistics(geometry);
+
+  return {
+    positions,
+    indices,
+    statistics: {
+      vertexCount: stats.vertexCount,
+      faceCount: stats.faceCount,
+      boundingBox: {
+        min: stats.boundingBox.min.toArray() as [number, number, number],
+        max: stats.boundingBox.max.toArray() as [number, number, number]
+      }
+    }
+  };
+}
+
 function toGeometry(payload: SliceWorkerRequest | GenerateLayersRequest): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(payload.positions), 3));
@@ -46,6 +137,10 @@ function toGeometry(payload: SliceWorkerRequest | GenerateLayersRequest): Buffer
 }
 
 const api = {
+  parseMesh(payload: ParseMeshRequest): ParseMeshResponse {
+    const geometry = createGeometryFromLoader(payload.buffer, payload);
+    return toParseResponse(geometry);
+  },
   slice(payload: SliceWorkerRequest): SliceWorkerResponse {
     const geometry = toGeometry(payload);
     const summary = sliceGeometry(geometry, {
