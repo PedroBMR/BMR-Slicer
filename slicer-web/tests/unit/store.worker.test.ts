@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 
 import { DEFAULT_PARAMETERS } from '../../modules/estimate';
+import { DEFAULT_PRINT_PARAMS } from '../../lib/estimate';
 import { useViewerStore } from '../../modules/store';
 
 const generateLayersMock = vi.fn();
@@ -100,14 +101,21 @@ describe('useViewerStore worker integration', () => {
       ]
     });
     estimateMock.mockResolvedValue({
-      summary: {
-        volume: 1,
-        mass: 2,
-        resinCost: 3,
-        durationMinutes: 4,
-        layers: 1
-      },
-      layers: []
+      breakdown: {
+        volumeModel_mm3: 1,
+        extrudedVolume_mm3: 1.5,
+        mass_g: 2,
+        filamentLen_mm: 3,
+        time_s: 120,
+        costs: {
+          filament: 1,
+          energy: 0.5,
+          maintenance: 0.25,
+          margin: 0.1,
+          total: 1.85
+        },
+        params: DEFAULT_PRINT_PARAMS
+      }
     });
 
     const fileBuffer = new ArrayBuffer(8);
@@ -123,10 +131,12 @@ describe('useViewerStore worker integration', () => {
     const [geometryRequest] = generateLayersMock.mock.calls[0];
     expect(geometryRequest.positions).toBeInstanceOf(ArrayBuffer);
     expect(estimateMock).toHaveBeenCalledTimes(1);
+    expect(estimateMock).toHaveBeenCalledWith({ volumeModel_mm3: 0.5 });
 
     const state = useViewerStore.getState();
     expect(state.layers).toHaveLength(1);
     expect(state.summary?.volume).toBe(1);
+    expect(state.summary?.durationMinutes).toBeCloseTo(2);
   });
 
   it('captures validation errors when persistence rejects', async () => {
@@ -162,14 +172,21 @@ describe('useViewerStore worker integration', () => {
       ]
     });
     estimateMock.mockResolvedValue({
-      summary: {
-        volume: 1,
-        mass: 2,
-        resinCost: 3,
-        durationMinutes: 4,
-        layers: 1
-      },
-      layers: []
+      breakdown: {
+        volumeModel_mm3: 1,
+        extrudedVolume_mm3: 1.5,
+        mass_g: 2,
+        filamentLen_mm: 3,
+        time_s: 120,
+        costs: {
+          filament: 1,
+          energy: 0.5,
+          maintenance: 0.25,
+          margin: 0.1,
+          total: 1.85
+        },
+        params: DEFAULT_PRINT_PARAMS
+      }
     });
 
     const error = new ZodError([]);
