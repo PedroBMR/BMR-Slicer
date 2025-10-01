@@ -1,15 +1,49 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 import { EstimateSummary } from '../../components/EstimateSummary';
+import { ParamsForm } from '../../components/ParamsForm';
+import { ResultsCard } from '../../components/ResultsCard';
+import type { EstimateBreakdown } from '../../lib/estimate';
 import type { LayerEstimate } from '../../modules/estimate';
 import { useViewerStore } from '../../modules/store';
 
 export default function EstimatesPage() {
   const layers = useViewerStore((state) => state.layers) as LayerEstimate[];
+  const summary = useViewerStore((state) => state.summary);
+
+  const volumeModel_mm3 = summary?.volume ?? 0;
+  const [breakdown, setBreakdown] = useState<EstimateBreakdown | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (volumeModel_mm3 <= 0) {
+      setBreakdown(null);
+    }
+  }, [volumeModel_mm3]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '1.5rem'
+        }}
+      >
+        <ParamsForm
+          volumeModel_mm3={volumeModel_mm3}
+          onEstimateChange={setBreakdown}
+          onLoadingChange={setLoading}
+          onErrorChange={setFormError}
+        />
+        <ResultsCard breakdown={breakdown} loading={loading} error={formError} />
+      </div>
+
       <EstimateSummary />
+
       <section
         style={{
           background: 'rgba(15, 23, 42, 0.55)',
