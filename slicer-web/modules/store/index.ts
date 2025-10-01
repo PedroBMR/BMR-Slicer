@@ -205,16 +205,26 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         parameters
       });
 
-      const estimateResponsePromise = getEstimateWorkerHandle().proxy.estimate({
-        positions: payload.positions.buffer.slice(0) as ArrayBuffer,
-        indices: payload.indices ? (payload.indices.buffer.slice(0) as ArrayBuffer) : undefined,
-        parameters
-      });
+      const metricsVolume = payload.metrics?.volume.absolute;
+      const estimateWorkerHandle = getEstimateWorkerHandle();
 
-      const [geometryResponse, estimateResponse] = await Promise.all([
-        geometryResponsePromise,
-        estimateResponsePromise
-      ]);
+      const estimateResponsePromise =
+        metricsVolume !== undefined
+          ? estimateWorkerHandle.proxy.estimate({
+              volumeModel_mm3: metricsVolume
+            })
+          : undefined;
+
+      const geometryResponse = await geometryResponsePromise;
+
+      const volumeModel_mm3 =
+        metricsVolume ??
+        geometryResponse.layers.reduce((acc, layer) => acc + layer.area * parameters.layerHeight, 0);
+
+      const estimateResponse =
+        estimateResponsePromise !== undefined
+          ? await estimateResponsePromise
+          : await estimateWorkerHandle.proxy.estimate({ volumeModel_mm3 });
 
       const layers: LayerEstimate[] = geometryResponse.layers.map((layer) => ({
         elevation: layer.elevation,
@@ -230,10 +240,10 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
       const summary: EstimateSummary = {
         layers,
-        volume: estimateResponse.summary.volume,
-        mass: estimateResponse.summary.mass,
-        resinCost: estimateResponse.summary.resinCost,
-        durationMinutes: estimateResponse.summary.durationMinutes
+        volume: estimateResponse.breakdown.volumeModel_mm3,
+        mass: estimateResponse.breakdown.mass_g,
+        resinCost: estimateResponse.breakdown.costs.total,
+        durationMinutes: estimateResponse.breakdown.time_s / 60
       };
 
       set({ layers, summary });
