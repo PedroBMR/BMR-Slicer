@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { ZodError } from 'zod';
 
 import { DEFAULT_PARAMETERS } from '../../modules/estimate';
@@ -7,11 +6,11 @@ import { useViewerStore } from '../../modules/store';
 
 const generateLayersMock = vi.fn();
 const estimateMock = vi.fn();
-var loadGeometryFromFileMock: ReturnType<typeof vi.fn>;
+const analyzeGeometryMock = vi.fn();
 
 vi.mock('../../modules/geometry/workerClient', () => ({
   getGeometryWorkerHandle: () => ({
-    proxy: { generateLayers: generateLayersMock },
+    proxy: { analyzeGeometry: analyzeGeometryMock, generateLayers: generateLayersMock },
     terminate: vi.fn(),
     worker: {} as unknown as Worker
   }),
@@ -26,17 +25,6 @@ vi.mock('../../modules/estimate/workerClient', () => ({
   }),
   releaseEstimateWorker: vi.fn()
 }));
-
-vi.mock('../../modules/geometry', async () => {
-  loadGeometryFromFileMock = vi.fn();
-  const actual = await vi.importActual<typeof import('../../modules/geometry')>(
-    '../../modules/geometry'
-  );
-  return {
-    ...actual,
-    loadGeometryFromFile: loadGeometryFromFileMock
-  };
-});
 
 const { saveEstimateMock, loadRecentEstimatesMock } = vi.hoisted(() => ({
   saveEstimateMock: vi.fn().mockResolvedValue(undefined),
@@ -53,7 +41,7 @@ describe('useViewerStore worker integration', () => {
     vi.clearAllMocks();
     generateLayersMock.mockReset();
     estimateMock.mockReset();
-    loadGeometryFromFileMock?.mockReset();
+    analyzeGeometryMock.mockReset();
     saveEstimateMock.mockReset();
     loadRecentEstimatesMock.mockReset();
     useViewerStore.setState({
@@ -67,6 +55,8 @@ describe('useViewerStore worker integration', () => {
       history: [],
       geometryPayload: undefined,
       geometrySource: undefined,
+      geometryMetrics: undefined,
+      geometryCenter: undefined,
       loadFile: useViewerStore.getState().loadFile,
       setGeometry: useViewerStore.getState().setGeometry,
       setParameters: useViewerStore.getState().setParameters,
@@ -78,13 +68,20 @@ describe('useViewerStore worker integration', () => {
   });
 
   it('delegates slicing and estimation to workers on loadFile', async () => {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3)
-    );
-
-    loadGeometryFromFileMock!.mockResolvedValue(geometry);
+    analyzeGeometryMock.mockImplementation(async () => {
+      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+      return {
+        positions: positions.buffer,
+        indices: undefined,
+        metrics: {
+          boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
+          size: [1, 1, 0],
+          triangleCount: 1,
+          volume: { signed: 0.5, absolute: 0.5 },
+          center: [0, 0, 0]
+        }
+      };
+    });
     generateLayersMock.mockResolvedValue({
       layers: [
         {
@@ -113,12 +110,15 @@ describe('useViewerStore worker integration', () => {
       layers: []
     });
 
-    const file = new File([new ArrayBuffer(8)], 'cube.stl', { type: 'model/stl' });
+    const fileBuffer = new ArrayBuffer(8);
+    const file = new File([fileBuffer], 'cube.stl', { type: 'model/stl' });
+    (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = vi
+      .fn()
+      .mockResolvedValue(fileBuffer.slice(0));
 
     await useViewerStore.getState().loadFile(file);
 
-    expect(loadGeometryFromFileMock).toBeDefined();
-    expect(loadGeometryFromFileMock).toHaveBeenCalledWith(file);
+    expect(analyzeGeometryMock).toHaveBeenCalledTimes(1);
     expect(generateLayersMock).toHaveBeenCalledTimes(1);
     const [geometryRequest] = generateLayersMock.mock.calls[0];
     expect(geometryRequest.positions).toBeInstanceOf(ArrayBuffer);
@@ -130,13 +130,20 @@ describe('useViewerStore worker integration', () => {
   });
 
   it('captures validation errors when persistence rejects', async () => {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 3)
-    );
-
-    loadGeometryFromFileMock!.mockResolvedValue(geometry);
+    analyzeGeometryMock.mockImplementation(async () => {
+      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+      return {
+        positions: positions.buffer,
+        indices: undefined,
+        metrics: {
+          boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
+          size: [1, 1, 0],
+          triangleCount: 1,
+          volume: { signed: 0.5, absolute: 0.5 },
+          center: [0, 0, 0]
+        }
+      };
+    });
     generateLayersMock.mockResolvedValue({
       layers: [
         {
@@ -168,7 +175,11 @@ describe('useViewerStore worker integration', () => {
     const error = new ZodError([]);
     saveEstimateMock.mockRejectedValueOnce(error);
 
-    const file = new File([new ArrayBuffer(8)], 'cube.stl', { type: 'model/stl' });
+    const fileBuffer = new ArrayBuffer(8);
+    const file = new File([fileBuffer], 'cube.stl', { type: 'model/stl' });
+    (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = vi
+      .fn()
+      .mockResolvedValue(fileBuffer.slice(0));
     await useViewerStore.getState().loadFile(file);
 
     await vi.waitFor(() => {

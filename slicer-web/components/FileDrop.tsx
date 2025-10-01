@@ -1,10 +1,7 @@
 'use client';
 
-import { transfer } from 'comlink';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute } from 'three';
 
-import { getGeometryWorkerHandle } from '../modules/geometry/workerClient';
 import { useViewerStore } from '../modules/store';
 
 const SUPPORTED_EXTENSIONS = ['.stl', '.3mf'];
@@ -23,23 +20,13 @@ function isSupportedFile(file: File): boolean {
   return file.type ? SUPPORTED_MIME_TYPES.has(file.type) : false;
 }
 
-function buildGeometry(positions: Float32Array, indices?: Uint32Array): BufferGeometry {
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  if (indices) {
-    geometry.setIndex(new Uint32BufferAttribute(indices, 1));
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
 export function FileDrop() {
   const [highlighted, setHighlighted] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const loading = useViewerStore((state) => state.loading);
   const error = useViewerStore((state) => state.error);
-  const setGeometry = useViewerStore((state) => state.setGeometry);
+  const loadFile = useViewerStore((state) => state.loadFile);
   const disposeWorkers = useViewerStore((state) => state.disposeWorkers);
 
   const resetInput = () => {
@@ -64,26 +51,8 @@ export function FileDrop() {
         return;
       }
 
-      useViewerStore.setState({ loading: true, error: undefined });
-
       try {
-        const buffer = await file.arrayBuffer();
-        const workerHandle = getGeometryWorkerHandle();
-        const response = await workerHandle.proxy.parseMesh(
-          transfer(
-            {
-              buffer,
-              fileName: file.name,
-              mimeType: file.type
-            },
-            [buffer]
-          )
-        );
-
-        const geometry = buildGeometry(response.positions, response.indices);
-        await setGeometry(geometry, file.name, file);
-
-        useViewerStore.setState({ loading: false });
+        await loadFile(file);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
         useViewerStore.setState({ error: message, loading: false });
@@ -91,7 +60,7 @@ export function FileDrop() {
         resetInput();
       }
     },
-    [setGeometry]
+    [loadFile]
   );
 
   const handleFiles = useCallback(
