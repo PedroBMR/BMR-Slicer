@@ -3,13 +3,10 @@
 import { transfer } from 'comlink';
 import { create } from 'zustand';
 import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
-import { ZodError } from 'zod';
-
 import type { EstimateParameters, EstimateSummary, LayerEstimate } from '../estimate';
 import { DEFAULT_PARAMETERS } from '../estimate';
 import { getGeometryWorkerHandle, releaseGeometryWorker } from '../geometry/workerClient';
 import { getEstimateWorkerHandle, releaseEstimateWorker } from '../estimate/workerClient';
-import { loadRecentEstimates, saveEstimate, type EstimateRecord } from './persistence';
 import type { GeometryMetrics } from '../../workers/geometry.worker';
 
 interface GeometryPayload {
@@ -26,7 +23,6 @@ export interface ViewerStoreState {
   loading: boolean;
   error?: string;
   fileName?: string;
-  history: EstimateRecord[];
   geometryPayload?: GeometryPayload;
   geometrySource?: ArrayBuffer | File;
   geometryMetrics?: GeometryMetrics;
@@ -44,7 +40,6 @@ export interface ViewerStoreActions {
   setParameters: (parameters: Partial<EstimateParameters>) => Promise<void>;
   recompute: () => Promise<void>;
   reset: () => void;
-  refreshHistory: () => Promise<void>;
   disposeWorkers: () => void;
 }
 
@@ -54,7 +49,6 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   layers: [],
   parameters: DEFAULT_PARAMETERS,
   loading: false,
-  history: [],
   geometrySource: undefined,
   geometryMetrics: undefined,
   geometryCenter: undefined,
@@ -140,44 +134,6 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       summary: undefined
     });
     await get().recompute();
-
-    const summary = get().summary;
-    if (summary) {
-      const record = {
-        fileName: fileName ?? 'untitled-mesh',
-        createdAt: new Date().toISOString(),
-        summary: {
-          volume: summary.volume,
-          mass: summary.mass,
-          resinCost: summary.resinCost,
-          durationMinutes: summary.durationMinutes,
-          layers: summary.layers.length
-        }
-      } satisfies EstimateRecord;
-
-      const handlePersistenceError = (error: unknown) => {
-        const message =
-          error instanceof ZodError
-            ? 'Failed to save estimate history: invalid estimate record.'
-            : error instanceof Error
-              ? error.message
-              : 'Unknown error';
-        set({ error: message });
-      };
-
-      try {
-        const operation = saveEstimate(record);
-        if (operation) {
-          void operation
-            .then(() => get().refreshHistory())
-            .catch((error) => {
-              handlePersistenceError(error);
-            });
-        }
-      } catch (error) {
-        handlePersistenceError(error);
-      }
-    }
   },
 
   async setParameters(parameters: Partial<EstimateParameters>) {
@@ -264,14 +220,6 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       geometryMetrics: undefined,
       geometryCenter: undefined
     });
-  },
-
-  async refreshHistory() {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const history = await loadRecentEstimates();
-    set({ history });
   },
 
   disposeWorkers() {

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ZodError } from 'zod';
 
 import { DEFAULT_PARAMETERS } from '../../modules/estimate';
 import { DEFAULT_PRINT_PARAMS } from '../../lib/estimate';
@@ -27,24 +26,12 @@ vi.mock('../../modules/estimate/workerClient', () => ({
   releaseEstimateWorker: vi.fn()
 }));
 
-const { saveEstimateMock, loadRecentEstimatesMock } = vi.hoisted(() => ({
-  saveEstimateMock: vi.fn().mockResolvedValue(undefined),
-  loadRecentEstimatesMock: vi.fn().mockResolvedValue([])
-}));
-
-vi.mock('../../modules/store/persistence', () => ({
-  saveEstimate: saveEstimateMock,
-  loadRecentEstimates: loadRecentEstimatesMock
-}));
-
 describe('useViewerStore worker integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateLayersMock.mockReset();
     estimateMock.mockReset();
     analyzeGeometryMock.mockReset();
-    saveEstimateMock.mockReset();
-    loadRecentEstimatesMock.mockReset();
     useViewerStore.setState({
       geometry: undefined,
       layers: [],
@@ -53,7 +40,6 @@ describe('useViewerStore worker integration', () => {
       loading: false,
       error: undefined,
       fileName: undefined,
-      history: [],
       geometryPayload: undefined,
       geometrySource: undefined,
       geometryMetrics: undefined,
@@ -63,7 +49,6 @@ describe('useViewerStore worker integration', () => {
       setParameters: useViewerStore.getState().setParameters,
       recompute: useViewerStore.getState().recompute,
       reset: useViewerStore.getState().reset,
-      refreshHistory: useViewerStore.getState().refreshHistory,
       disposeWorkers: useViewerStore.getState().disposeWorkers
     });
   });
@@ -139,68 +124,4 @@ describe('useViewerStore worker integration', () => {
     expect(state.summary?.durationMinutes).toBeCloseTo(2);
   });
 
-  it('captures validation errors when persistence rejects', async () => {
-    analyzeGeometryMock.mockImplementation(async () => {
-      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
-      return {
-        positions: positions.buffer,
-        indices: undefined,
-        metrics: {
-          boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
-          size: [1, 1, 0],
-          triangleCount: 1,
-          volume: { signed: 0.5, absolute: 0.5 },
-          center: [0, 0, 0]
-        }
-      };
-    });
-    generateLayersMock.mockResolvedValue({
-      layers: [
-        {
-          elevation: 0,
-          area: 1,
-          circumference: 2,
-          boundingRadius: 3,
-          centroid: [0, 0, 0] as [number, number, number],
-          segments: [
-            {
-              start: [0, 0, 0] as [number, number, number],
-              end: [1, 0, 0] as [number, number, number]
-            }
-          ]
-        }
-      ]
-    });
-    estimateMock.mockResolvedValue({
-      breakdown: {
-        volumeModel_mm3: 1,
-        extrudedVolume_mm3: 1.5,
-        mass_g: 2,
-        filamentLen_mm: 3,
-        time_s: 120,
-        costs: {
-          filament: 1,
-          energy: 0.5,
-          maintenance: 0.25,
-          margin: 0.1,
-          total: 1.85
-        },
-        params: DEFAULT_PRINT_PARAMS
-      }
-    });
-
-    const error = new ZodError([]);
-    saveEstimateMock.mockRejectedValueOnce(error);
-
-    const fileBuffer = new ArrayBuffer(8);
-    const file = new File([fileBuffer], 'cube.stl', { type: 'model/stl' });
-    (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = vi
-      .fn()
-      .mockResolvedValue(fileBuffer.slice(0));
-    await useViewerStore.getState().loadFile(file);
-
-    await vi.waitFor(() => {
-      expect(useViewerStore.getState().error).toContain('Failed to save estimate history');
-    });
-  });
 });
