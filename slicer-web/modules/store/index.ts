@@ -75,6 +75,9 @@ export type ViewerStore = ViewerStoreState & ViewerStoreActions;
 
 const recomputeScheduler = createIdleScheduler();
 
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+export const FILE_TOO_LARGE_ERROR = 'File is too large. Please upload a file smaller than 50 MB.';
+
 export const useViewerStore = create<ViewerStore>((set, get) => ({
   layers: [],
   parameters: DEFAULT_PARAMETERS,
@@ -89,6 +92,11 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   gcodeError: undefined,
 
   async loadFile(file: File) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      set({ error: FILE_TOO_LARGE_ERROR, loading: false });
+      return;
+    }
+
     set({ loading: true, error: undefined });
     try {
       const response = await computeGeometry(file);

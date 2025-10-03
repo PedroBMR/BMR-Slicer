@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { useViewerStore } from '../modules/store';
+import { FILE_TOO_LARGE_ERROR, MAX_FILE_SIZE_BYTES, useViewerStore } from '../modules/store';
 
 const SUPPORTED_EXTENSIONS = ['.stl', '.3mf'];
 const SUPPORTED_MIME_TYPES = new Set([
@@ -39,6 +39,12 @@ export function FileDrop() {
   const handleFile = useCallback(
     async (file: File | undefined) => {
       if (!file) {
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        useViewerStore.setState({ error: FILE_TOO_LARGE_ERROR, loading: false });
+        resetInput();
         return;
       }
 
