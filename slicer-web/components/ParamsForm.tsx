@@ -11,6 +11,7 @@ import {
   type PrintParams
 } from '../lib/estimate';
 import { getEstimateWorkerHandle } from '../modules/estimate/workerClient';
+import { useViewerStore } from '../modules/store';
 
 const MATERIAL_OPTIONS = Object.keys(MATERIAL_DENSITIES) as Material[];
 const MaterialSchema = z.enum(MATERIAL_OPTIONS as [Material, ...Material[]]);
@@ -75,6 +76,32 @@ export interface ParamsFormProps {
   initialParams?: Partial<PrintParams>;
 }
 
+export interface OverrideMetrics {
+  time_s: number;
+  filamentLen_mm: number;
+}
+
+export function mergeBreakdownWithOverride(
+  base: EstimateBreakdown | null,
+  override: OverrideMetrics | null | undefined
+): EstimateBreakdown | null {
+  if (!base) {
+    return null;
+  }
+
+  if (!override) {
+    return { ...base, costs: { ...base.costs }, params: base.params };
+  }
+
+  return {
+    ...base,
+    costs: { ...base.costs },
+    params: base.params,
+    time_s: override.time_s,
+    filamentLen_mm: override.filamentLen_mm
+  };
+}
+
 function formatNumber(value: number | undefined, fractionDigits = 2) {
   if (!Number.isFinite(value)) {
     return '';
@@ -122,14 +149,17 @@ export function ParamsForm({
   const [formValues, setFormValues] = useState<FormState>(mergedDefaults);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
+  const [workerBreakdown, setWorkerBreakdown] = useState<EstimateBreakdown | null>(null);
+  const gcodeOverride = useViewerStore((state) => state.gcodeOverride);
+  const gcodeError = useViewerStore((state) => state.gcodeError);
 
   useEffect(() => {
     setFormValues(mergedDefaults);
   }, [mergedDefaults]);
 
   useEffect(() => {
-    onErrorChange?.(generalError);
-  }, [generalError, onErrorChange]);
+    onErrorChange?.(gcodeError ?? generalError);
+  }, [generalError, gcodeError, onErrorChange]);
 
   const parsedResult = useMemo(() => {
     const parsed: FormValues = {
@@ -176,14 +206,14 @@ export function ParamsForm({
 
     if (!result.success) {
       setGeneralError('Preencha os campos com valores válidos.');
-      onEstimateChange(null);
+      setWorkerBreakdown(null);
       updateLoading(false);
       return;
     }
 
     if (volumeModel_mm3 <= 0) {
       setGeneralError('Carregue um modelo para obter o volume da peça.');
-      onEstimateChange(null);
+      setWorkerBreakdown(null);
       updateLoading(false);
       return;
     }
@@ -223,13 +253,13 @@ export function ParamsForm({
 
         const response = await worker.proxy.estimate({ volumeModel_mm3, params });
         if (!cancelled) {
-          onEstimateChange(response.breakdown);
+          setWorkerBreakdown(response.breakdown);
         }
       } catch (error) {
         if (!cancelled) {
           const message = error instanceof Error ? error.message : 'Erro desconhecido ao estimar.';
           setGeneralError(message);
-          onEstimateChange(null);
+          setWorkerBreakdown(null);
         }
       } finally {
         if (!cancelled) {
@@ -243,7 +273,12 @@ export function ParamsForm({
     return () => {
       cancelled = true;
     };
-  }, [parsedResult, volumeModel_mm3, onEstimateChange]);
+  }, [parsedResult, volumeModel_mm3]);
+
+  useEffect(() => {
+    const merged = mergeBreakdownWithOverride(workerBreakdown, gcodeOverride);
+    onEstimateChange(merged);
+  }, [workerBreakdown, gcodeOverride, onEstimateChange]);
 
   function updateLoading(loading: boolean) {
     if (pendingRef.current === loading) {
@@ -478,8 +513,8 @@ export function ParamsForm({
             <span style={{ fontSize: '1.125rem' }}>{targetFlowDisplay} mm³/s</span>
           </div>
         </div>
-        {generalError ? (
-          <p style={{ color: '#f87171', margin: 0 }}>{generalError}</p>
+        {gcodeError ?? generalError ? (
+          <p style={{ color: '#f87171', margin: 0 }}>{gcodeError ?? generalError}</p>
         ) : (
           <p style={{ color: '#94a3b8', margin: 0 }}>
             As estimativas são atualizadas automaticamente sempre que um campo é alterado.

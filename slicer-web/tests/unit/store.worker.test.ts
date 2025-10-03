@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => {
   return {
     computeGeometryMock: vi.fn(),
     computeGeometryLayersMock: vi.fn(),
-    computeEstimateMock: vi.fn()
+    computeEstimateMock: vi.fn(),
+    parseAndEstimateMock: vi.fn()
   };
 });
 
@@ -20,12 +21,17 @@ vi.mock('../../lib/compute', () => ({
   releaseEstimateCompute: vi.fn()
 }));
 
+vi.mock('../../lib/gcode', () => ({
+  parseAndEstimate: mocks.parseAndEstimateMock
+}));
+
 describe('useViewerStore worker integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.computeGeometryMock.mockReset();
     mocks.computeGeometryLayersMock.mockReset();
     mocks.computeEstimateMock.mockReset();
+    mocks.parseAndEstimateMock.mockReset();
     useViewerStore.setState({
       geometry: undefined,
       layers: [],
@@ -38,10 +44,17 @@ describe('useViewerStore worker integration', () => {
       geometrySource: undefined,
       geometryMetrics: undefined,
       geometryCenter: undefined,
+      estimateBreakdown: undefined,
+      effectiveBreakdown: undefined,
+      gcodeOverride: undefined,
+      gcodeLoading: false,
+      gcodeError: undefined,
       loadFile: useViewerStore.getState().loadFile,
       setGeometry: useViewerStore.getState().setGeometry,
       setParameters: useViewerStore.getState().setParameters,
       recompute: useViewerStore.getState().recompute,
+      loadGcode: useViewerStore.getState().loadGcode,
+      clearGcodeOverride: useViewerStore.getState().clearGcodeOverride,
       reset: useViewerStore.getState().reset,
       disposeWorkers: useViewerStore.getState().disposeWorkers
     });
@@ -117,4 +130,55 @@ describe('useViewerStore worker integration', () => {
     expect(state.summary?.durationMinutes).toBeCloseTo(2);
   });
 
+  it('applies G-code overrides and clears them correctly', async () => {
+    const baseBreakdown = {
+      volumeModel_mm3: 1,
+      extrudedVolume_mm3: 1.5,
+      mass_g: 2,
+      filamentLen_mm: 3,
+      time_s: 120,
+      costs: {
+        filament: 1,
+        energy: 0.5,
+        maintenance: 0.25,
+        margin: 0.1,
+        total: 1.85
+      },
+      params: DEFAULT_PRINT_PARAMS
+    };
+
+    useViewerStore.setState({
+      summary: {
+        layers: [],
+        volume: baseBreakdown.volumeModel_mm3,
+        mass: baseBreakdown.mass_g,
+        resinCost: baseBreakdown.costs.total,
+        durationMinutes: baseBreakdown.time_s / 60
+      },
+      estimateBreakdown: baseBreakdown,
+      effectiveBreakdown: baseBreakdown
+    });
+
+    const file = new File(['G1 X1 Y1 F1200'], 'override.gcode', { type: 'text/plain' });
+    (file as unknown as { text: () => Promise<string> }).text = vi
+      .fn()
+      .mockResolvedValue('G1 X1 Y1 F1200');
+    mocks.parseAndEstimateMock.mockReturnValue({ time_s: 600, filamentLen_mm: 12 });
+
+    await useViewerStore.getState().loadGcode(file);
+
+    const stateAfterLoad = useViewerStore.getState();
+    expect(stateAfterLoad.gcodeOverride?.fileName).toBe('override.gcode');
+    expect(stateAfterLoad.summary?.durationMinutes).toBeCloseTo(10);
+    expect(stateAfterLoad.effectiveBreakdown?.time_s).toBe(600);
+    expect(stateAfterLoad.effectiveBreakdown?.filamentLen_mm).toBe(12);
+
+    useViewerStore.getState().clearGcodeOverride();
+
+    const stateAfterClear = useViewerStore.getState();
+    expect(stateAfterClear.gcodeOverride).toBeUndefined();
+    expect(stateAfterClear.summary?.durationMinutes).toBeCloseTo(2);
+    expect(stateAfterClear.effectiveBreakdown?.time_s).toBe(120);
+    expect(stateAfterClear.effectiveBreakdown?.filamentLen_mm).toBe(3);
+  });
 });
