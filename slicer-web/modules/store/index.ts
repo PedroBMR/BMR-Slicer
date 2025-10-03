@@ -1,13 +1,18 @@
 'use client';
 
-import { transfer } from 'comlink';
 import { create } from 'zustand';
 import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
 import type { EstimateParameters, EstimateSummary, LayerEstimate } from '../estimate';
 import { DEFAULT_PARAMETERS } from '../estimate';
-import { getGeometryWorkerHandle, releaseGeometryWorker } from '../geometry/workerClient';
-import { getEstimateWorkerHandle, releaseEstimateWorker } from '../estimate/workerClient';
-import type { GeometryMetrics } from '../../workers/geometry.worker';
+import {
+  computeEstimate,
+  computeGeometry,
+  computeGeometryLayers,
+  releaseEstimateCompute,
+  releaseGeometryCompute,
+  type GeometryLayerSummary,
+  type GeometryMetrics
+} from '../../lib/compute';
 
 interface GeometryPayload {
   positions: Float32Array;
@@ -56,21 +61,10 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   async loadFile(file: File) {
     set({ loading: true, error: undefined });
     try {
-      const buffer = await file.arrayBuffer();
-      const worker = getGeometryWorkerHandle();
-      const response = await worker.proxy.analyzeGeometry(
-        transfer(
-          {
-            buffer,
-            fileName: file.name,
-            mimeType: file.type
-          },
-          [buffer]
-        )
-      );
+      const response = await computeGeometry(file);
 
-      const positions = new Float32Array(response.positions);
-      const indices = response.indices ? new Uint32Array(response.indices) : undefined;
+      const positions = response.positions;
+      const indices = response.indices;
 
       const geometry = new BufferGeometry();
       geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
@@ -155,34 +149,25 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       set({ error: undefined });
       const parameters = get().parameters;
 
-      const geometryResponsePromise = getGeometryWorkerHandle().proxy.generateLayers({
-        positions: payload.positions.buffer.slice(0) as ArrayBuffer,
-        indices: payload.indices ? (payload.indices.buffer.slice(0) as ArrayBuffer) : undefined,
-        parameters
-      });
-
       const metricsVolume = payload.metrics?.volume.absolute;
-      const estimateWorkerHandle = getEstimateWorkerHandle();
-
       const estimateResponsePromise =
-        metricsVolume !== undefined
-          ? estimateWorkerHandle.proxy.estimate({
-              volumeModel_mm3: metricsVolume
-            })
-          : undefined;
+        metricsVolume !== undefined ? computeEstimate(metricsVolume) : undefined;
 
-      const geometryResponse = await geometryResponsePromise;
+      const { layers: rawLayers, volume } = await computeGeometryLayers(
+        {
+          positions: payload.positions,
+          indices: payload.indices
+        },
+        parameters
+      );
 
-      const volumeModel_mm3 =
-        metricsVolume ??
-        geometryResponse.layers.reduce((acc, layer) => acc + layer.area * parameters.layerHeight, 0);
-
+      const volumeModel_mm3 = metricsVolume ?? volume;
       const estimateResponse =
         estimateResponsePromise !== undefined
           ? await estimateResponsePromise
-          : await estimateWorkerHandle.proxy.estimate({ volumeModel_mm3 });
+          : await computeEstimate(volumeModel_mm3);
 
-      const layers: LayerEstimate[] = geometryResponse.layers.map((layer) => ({
+      const layers: LayerEstimate[] = rawLayers.map((layer: GeometryLayerSummary) => ({
         elevation: layer.elevation,
         area: layer.area,
         circumference: layer.circumference,
@@ -223,7 +208,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   },
 
   disposeWorkers() {
-    releaseGeometryWorker();
-    releaseEstimateWorker();
+    releaseGeometryCompute();
+    releaseEstimateCompute();
   }
 }));

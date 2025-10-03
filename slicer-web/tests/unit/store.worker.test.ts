@@ -4,34 +4,28 @@ import { DEFAULT_PARAMETERS } from '../../modules/estimate';
 import { DEFAULT_PRINT_PARAMS } from '../../lib/estimate';
 import { useViewerStore } from '../../modules/store';
 
-const generateLayersMock = vi.fn();
-const estimateMock = vi.fn();
-const analyzeGeometryMock = vi.fn();
+const mocks = vi.hoisted(() => {
+  return {
+    computeGeometryMock: vi.fn(),
+    computeGeometryLayersMock: vi.fn(),
+    computeEstimateMock: vi.fn()
+  };
+});
 
-vi.mock('../../modules/geometry/workerClient', () => ({
-  getGeometryWorkerHandle: () => ({
-    proxy: { analyzeGeometry: analyzeGeometryMock, generateLayers: generateLayersMock },
-    terminate: vi.fn(),
-    worker: {} as unknown as Worker
-  }),
-  releaseGeometryWorker: vi.fn()
-}));
-
-vi.mock('../../modules/estimate/workerClient', () => ({
-  getEstimateWorkerHandle: () => ({
-    proxy: { estimate: estimateMock },
-    terminate: vi.fn(),
-    worker: {} as unknown as Worker
-  }),
-  releaseEstimateWorker: vi.fn()
+vi.mock('../../lib/compute', () => ({
+  computeGeometry: mocks.computeGeometryMock,
+  computeGeometryLayers: mocks.computeGeometryLayersMock,
+  computeEstimate: mocks.computeEstimateMock,
+  releaseGeometryCompute: vi.fn(),
+  releaseEstimateCompute: vi.fn()
 }));
 
 describe('useViewerStore worker integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    generateLayersMock.mockReset();
-    estimateMock.mockReset();
-    analyzeGeometryMock.mockReset();
+    mocks.computeGeometryMock.mockReset();
+    mocks.computeGeometryLayersMock.mockReset();
+    mocks.computeEstimateMock.mockReset();
     useViewerStore.setState({
       geometry: undefined,
       layers: [],
@@ -54,21 +48,19 @@ describe('useViewerStore worker integration', () => {
   });
 
   it('delegates slicing and estimation to workers on loadFile', async () => {
-    analyzeGeometryMock.mockImplementation(async () => {
-      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
-      return {
-        positions: positions.buffer,
-        indices: undefined,
-        metrics: {
-          boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
-          size: [1, 1, 0],
-          triangleCount: 1,
-          volume: { signed: 0.5, absolute: 0.5 },
-          center: [0, 0, 0]
-        }
-      };
+    const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+    mocks.computeGeometryMock.mockResolvedValue({
+      positions,
+      indices: undefined,
+      metrics: {
+        boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
+        size: [1, 1, 0],
+        triangleCount: 1,
+        volume: { signed: 0.5, absolute: 0.5 },
+        center: [0, 0, 0]
+      }
     });
-    generateLayersMock.mockResolvedValue({
+    mocks.computeGeometryLayersMock.mockResolvedValue({
       layers: [
         {
           elevation: 0,
@@ -83,9 +75,10 @@ describe('useViewerStore worker integration', () => {
             }
           ]
         }
-      ]
+      ],
+      volume: 1
     });
-    estimateMock.mockResolvedValue({
+    mocks.computeEstimateMock.mockResolvedValue({
       breakdown: {
         volumeModel_mm3: 1,
         extrudedVolume_mm3: 1.5,
@@ -111,12 +104,12 @@ describe('useViewerStore worker integration', () => {
 
     await useViewerStore.getState().loadFile(file);
 
-    expect(analyzeGeometryMock).toHaveBeenCalledTimes(1);
-    expect(generateLayersMock).toHaveBeenCalledTimes(1);
-    const [geometryRequest] = generateLayersMock.mock.calls[0];
-    expect(geometryRequest.positions).toBeInstanceOf(ArrayBuffer);
-    expect(estimateMock).toHaveBeenCalledTimes(1);
-    expect(estimateMock).toHaveBeenCalledWith({ volumeModel_mm3: 0.5 });
+    expect(mocks.computeGeometryMock).toHaveBeenCalledTimes(1);
+    expect(mocks.computeGeometryLayersMock).toHaveBeenCalledTimes(1);
+    const [geometryRequest] = mocks.computeGeometryLayersMock.mock.calls[0];
+    expect(geometryRequest.positions).toBeInstanceOf(Float32Array);
+    expect(mocks.computeEstimateMock).toHaveBeenCalledTimes(1);
+    expect(mocks.computeEstimateMock).toHaveBeenCalledWith(0.5);
 
     const state = useViewerStore.getState();
     expect(state.layers).toHaveLength(1);
