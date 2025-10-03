@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 
 import type { EstimateBreakdown } from '../lib/estimate';
+import { FEATURE_FLAGS } from '../lib/config';
 import { exportPDF, exportXLSX } from '../modules/exporters';
 import { useSavedEstimatesStore } from '../modules/persistence/store';
 import { useViewerStore } from '../modules/store';
@@ -20,11 +22,22 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
 
   const fileName = useViewerStore((state) => state.fileName);
   const geometrySource = useViewerStore((state) => state.geometrySource);
+  const { loadGcode, clearGcodeOverride, gcodeOverride, gcodeLoading, gcodeError } = useViewerStore(
+    (state) => ({
+      loadGcode: state.loadGcode,
+      clearGcodeOverride: state.clearGcodeOverride,
+      gcodeOverride: state.gcodeOverride,
+      gcodeLoading: state.gcodeLoading,
+      gcodeError: state.gcodeError
+    })
+  );
 
   const { saveEstimate, saving } = useSavedEstimatesStore((state) => ({
     saveEstimate: state.saveEstimate,
     saving: state.saving
   }));
+
+  const gcodeInputRef = useRef<HTMLInputElement | null>(null);
 
   const baseFileName = useMemo(() => {
     if (!fileName || fileName.trim().length === 0) {
@@ -60,6 +73,24 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
     return `${hours.toString().padStart(2, '0')}:${paddedMinutes}`;
   }, [breakdown]);
 
+  const overrideTimeDisplay = useMemo(() => {
+    if (!gcodeOverride) {
+      return null;
+    }
+    const totalMinutes = gcodeOverride.time_s / 60;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = Math.round(totalMinutes % 60);
+    const paddedMinutes = minutes.toString().padStart(2, '0');
+    return `${hours.toString().padStart(2, '0')}:${paddedMinutes}`;
+  }, [gcodeOverride]);
+
+  const overrideFilamentDisplay = useMemo(() => {
+    if (!gcodeOverride) {
+      return null;
+    }
+    return `${(gcodeOverride.filamentLen_mm / 1000).toFixed(2)} m`;
+  }, [gcodeOverride]);
+
   const formattedBreakdown = useMemo(() => {
     if (!breakdown) {
       return null;
@@ -73,6 +104,24 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       timeMinutes: breakdown.time_s / 60
     };
   }, [breakdown]);
+
+  const handleGcodeUploadClick = useCallback(() => {
+    if (gcodeLoading) {
+      return;
+    }
+    gcodeInputRef.current?.click();
+  }, [gcodeLoading]);
+
+  const handleGcodeChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        void loadGcode(file);
+      }
+      event.target.value = '';
+    },
+    [loadGcode]
+  );
 
   const handleCopy = useCallback(async () => {
     if (!breakdown) {
@@ -191,6 +240,10 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
   }, [feedback, feedbackError]);
 
   const hasBreakdown = Boolean(breakdown);
+  const showGcodeControls = FEATURE_FLAGS.enableGcodeUpload && hasBreakdown;
+  const timeSourceNote = gcodeOverride
+    ? 'Tempo estimado com base no G-code carregado.'
+    : null;
 
   return (
     <section
@@ -294,6 +347,85 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
         </div>
       </header>
 
+      {showGcodeControls ? (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            background: 'rgba(15, 23, 42, 0.35)',
+            borderRadius: '0.75rem',
+            padding: '1rem'
+          }}
+        >
+          <input
+            ref={gcodeInputRef}
+            type="file"
+            accept=".gcode,text/plain"
+            style={{ display: 'none' }}
+            onChange={handleGcodeChange}
+          />
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              alignItems: 'center'
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleGcodeUploadClick}
+              disabled={gcodeLoading}
+              style={{
+                padding: '0.5rem 1.25rem',
+                borderRadius: '9999px',
+                border: '1px solid rgba(148, 163, 184, 0.4)',
+                background: gcodeLoading ? 'rgba(148, 163, 184, 0.2)' : '#38bdf8',
+                color: gcodeLoading ? '#94a3b8' : '#0f172a',
+                fontWeight: 600,
+                cursor: gcodeLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {gcodeLoading ? 'Processando...' : 'Upload G-code'}
+            </button>
+            {gcodeOverride ? (
+              <button
+                type="button"
+                onClick={clearGcodeOverride}
+                disabled={gcodeLoading}
+                style={{
+                  padding: '0.5rem 1.25rem',
+                  borderRadius: '9999px',
+                  border: '1px solid rgba(148, 163, 184, 0.4)',
+                  background: 'transparent',
+                  color: '#f8fafc',
+                  fontWeight: 600,
+                  cursor: gcodeLoading ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Usar estimativa heurística
+              </button>
+            ) : null}
+          </div>
+          {gcodeOverride ? (
+            <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>
+              <strong>{gcodeOverride.fileName}</strong>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span>Tempo: {overrideTimeDisplay}</span>
+                <span>Filamento: {overrideFilamentDisplay}</span>
+              </div>
+            </div>
+          ) : (
+            <p style={{ margin: 0, color: '#94a3b8' }}>
+              Envie um arquivo G-code para substituir as estimativas heurísticas de tempo e
+              filamento.
+            </p>
+          )}
+          {gcodeError ? <p style={{ margin: 0, color: '#f87171' }}>{gcodeError}</p> : null}
+        </div>
+      ) : null}
+
       {feedback ? (
         <p style={{ color: '#4ade80', margin: 0 }}>{feedback}</p>
       ) : null}
@@ -326,6 +458,9 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
           }
         />
       </div>
+      {timeSourceNote ? (
+        <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem' }}>{timeSourceNote}</p>
+      ) : null}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <h3 style={{ margin: 0 }}>Detalhamento de custos</h3>

@@ -51,6 +51,13 @@ pnpm dev
 The app is available at [http://localhost:3000](http://localhost:3000). Upload a mesh to the
 viewer, explore generated layers, and export reports.
 
+### Environment configuration
+
+Set `NEXT_PUBLIC_ENABLE_GCODE_UPLOAD=true` to expose an experimental control on the estimate page
+that accepts `.gcode` files. When active, uploaded G-code replaces the heuristic print duration and
+filament usage values derived from slicing parameters. Clearing the override restores the default
+heuristic estimate. Omit or set the flag to `false` to keep the original behaviour.
+
 ## Available commands
 
 | Command              | Description                                         |
