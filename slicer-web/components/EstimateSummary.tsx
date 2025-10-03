@@ -12,6 +12,7 @@ import { useViewerStore } from '../modules/store';
 export function EstimateSummary() {
   const summary = useViewerStore((state) => state.summary);
   const fileName = useViewerStore((state) => state.fileName) ?? 'slicer-report';
+  const gcodeOverride = useViewerStore((state) => state.gcodeOverride);
 
   const metrics = useMemo(() => {
     if (!summary) {
@@ -57,7 +58,11 @@ export function EstimateSummary() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: 0 }}>Print estimate</h2>
-          <p style={{ margin: 0, color: '#94a3b8' }}>Computed using adaptive slicing heuristics.</p>
+          <p style={{ margin: 0, color: '#94a3b8' }}>
+            {gcodeOverride
+              ? 'Timing derived from uploaded G-code.'
+              : 'Computed using adaptive slicing heuristics.'}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
