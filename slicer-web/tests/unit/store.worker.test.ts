@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_PARAMETERS } from '../../modules/estimate';
 import { DEFAULT_PRINT_PARAMS } from '../../lib/estimate';
-import { useViewerStore } from '../../modules/store';
+import { FILE_TOO_LARGE_ERROR, MAX_FILE_SIZE_BYTES, useViewerStore } from '../../modules/store';
 
 const mocks = vi.hoisted(() => {
   return {
@@ -135,6 +135,20 @@ describe('useViewerStore worker integration', () => {
     expect(state.layers).toHaveLength(1);
     expect(state.summary?.volume).toBe(1);
     expect(state.summary?.durationMinutes).toBeCloseTo(2);
+  });
+
+  it('prevents loading files larger than the maximum size', async () => {
+    const file = new File(['dummy'], 'too-large.stl', { type: 'model/stl' });
+    Object.defineProperty(file, 'size', {
+      get: () => MAX_FILE_SIZE_BYTES + 1
+    });
+
+    await useViewerStore.getState().loadFile(file);
+
+    expect(mocks.computeGeometryMock).not.toHaveBeenCalled();
+    const state = useViewerStore.getState();
+    expect(state.error).toBe(FILE_TOO_LARGE_ERROR);
+    expect(state.loading).toBe(false);
   });
 
   it('applies G-code overrides and clears them correctly', async () => {
