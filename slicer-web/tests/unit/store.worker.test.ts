@@ -188,4 +188,61 @@ describe('useViewerStore worker integration', () => {
     expect(stateAfterClear.effectiveBreakdown?.time_s).toBe(120);
     expect(stateAfterClear.effectiveBreakdown?.filamentLen_mm).toBe(3);
   });
+
+  it('debounces recompute when parameters change rapidly', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+
+      mocks.computeGeometryLayersMock.mockResolvedValue({
+        layers: [],
+        volume: 1,
+        positions,
+        positionsBuffer: positions.buffer,
+        indices: undefined,
+        indicesBuffer: undefined
+      });
+
+      mocks.computeEstimateMock.mockResolvedValue({
+        breakdown: {
+          volumeModel_mm3: 1,
+          extrudedVolume_mm3: 1.5,
+          mass_g: 2,
+          filamentLen_mm: 3,
+          time_s: 120,
+          costs: {
+            filament: 1,
+            energy: 0.5,
+            maintenance: 0.25,
+            margin: 0.1,
+            total: 1.85
+          },
+          params: DEFAULT_PRINT_PARAMS
+        }
+      });
+
+      useViewerStore.setState({
+        geometryPayload: {
+          positions,
+          positionsBuffer: positions.buffer,
+          indices: undefined,
+          indicesBuffer: undefined
+        }
+      });
+
+      const promise1 = useViewerStore.getState().setParameters({ layerHeight_mm: 0.1 });
+      const promise2 = useViewerStore.getState().setParameters({ layerHeight_mm: 0.2 });
+      const promise3 = useViewerStore.getState().setParameters({ layerHeight_mm: 0.3 });
+
+      await vi.runAllTimersAsync();
+      await Promise.all([promise1, promise2, promise3]);
+
+      expect(mocks.computeGeometryLayersMock).toHaveBeenCalledTimes(1);
+      expect(mocks.computeEstimateMock).toHaveBeenCalledTimes(1);
+      expect(useViewerStore.getState().parameters.layerHeight_mm).toBeCloseTo(0.3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
