@@ -31,7 +31,9 @@ function getEstimateWorkerHandle(): WorkerHandle<EstimateWorkerApi> {
 
 export interface GeometryComputationResult {
   positions: Float32Array;
+  positionsBuffer: ArrayBuffer;
   indices?: Uint32Array;
+  indicesBuffer?: ArrayBuffer;
   metrics: GeometryMetrics;
 }
 
@@ -49,9 +51,20 @@ export interface GeometryLayerSummary {
   segments: GeometryLayerSegment[];
 }
 
+export interface GeometryLayerRequestPayload {
+  positions: Float32Array;
+  positionsBuffer?: ArrayBuffer;
+  indices?: Uint32Array;
+  indicesBuffer?: ArrayBuffer;
+}
+
 export interface GeometryLayerResult {
   layers: GeometryLayerSummary[];
   volume: number;
+  positions: Float32Array;
+  positionsBuffer: ArrayBuffer;
+  indices?: Uint32Array;
+  indicesBuffer?: ArrayBuffer;
 }
 
 export async function computeGeometry(file: File): Promise<GeometryComputationResult> {
@@ -70,28 +83,30 @@ export async function computeGeometry(file: File): Promise<GeometryComputationRe
 
   return {
     positions: new Float32Array(response.positions),
+    positionsBuffer: response.positions,
     indices: response.indices ? new Uint32Array(response.indices) : undefined,
+    indicesBuffer: response.indices,
     metrics: response.metrics
   };
 }
 
 export async function computeGeometryLayers(
-  payload: { positions: Float32Array; indices?: Uint32Array },
+  payload: GeometryLayerRequestPayload,
   parameters: EstimateParameters
 ): Promise<GeometryLayerResult> {
-  const positions = payload.positions.buffer.slice(0);
-  const indices = payload.indices ? payload.indices.buffer.slice(0) : undefined;
+  const positionsBuffer = payload.positionsBuffer ?? payload.positions.buffer;
+  const indicesBuffer = payload.indices ? payload.indicesBuffer ?? payload.indices.buffer : undefined;
   const handle = getGeometryWorkerHandle();
-  const transferables: ArrayBuffer[] = [positions];
-  if (indices) {
-    transferables.push(indices);
+  const transferables: ArrayBuffer[] = [positionsBuffer];
+  if (indicesBuffer) {
+    transferables.push(indicesBuffer);
   }
 
   const response = await handle.proxy.generateLayers(
     transfer(
       {
-        positions,
-        indices,
+        positions: positionsBuffer,
+        indices: indicesBuffer,
         parameters
       },
       transferables
@@ -105,7 +120,11 @@ export async function computeGeometryLayers(
 
   return {
     layers: response.layers,
-    volume
+    volume,
+    positions: new Float32Array(response.positions),
+    positionsBuffer: response.positions,
+    indices: response.indices ? new Uint32Array(response.indices) : undefined,
+    indicesBuffer: response.indices
   };
 }
 

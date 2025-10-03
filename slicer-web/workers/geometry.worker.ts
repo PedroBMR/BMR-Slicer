@@ -52,6 +52,8 @@ export interface GenerateLayersResponse {
     centroid: [number, number, number];
     segments: Array<{ start: [number, number, number]; end: [number, number, number] }>;
   }>;
+  positions: ArrayBuffer;
+  indices?: ArrayBuffer;
 }
 
 export interface ParseMeshRequest {
@@ -203,10 +205,10 @@ function toGeometry(payload: SliceWorkerRequest | GenerateLayersRequest): Buffer
 
 function geometryFromTypedArrays(positions: ArrayBuffer, indices?: ArrayBuffer): BufferGeometry {
   const geometry = new BufferGeometry();
-  const positionsArray = new Float32Array(new Float32Array(positions));
+  const positionsArray = new Float32Array(positions);
   geometry.setAttribute('position', new Float32BufferAttribute(positionsArray, 3));
   if (indices) {
-    const indicesArray = new Uint32Array(new Uint32Array(indices));
+    const indicesArray = new Uint32Array(indices);
     geometry.setIndex(new Uint32BufferAttribute(indicesArray, 1));
   }
   return geometry;
@@ -358,19 +360,29 @@ const api = {
     const geometry = toGeometry(payload);
     const layers = generateLayers(geometry, { parameters: payload.parameters });
 
-    return {
-      layers: layers.map((layer) => ({
-        elevation: layer.elevation,
-        area: layer.area,
-        circumference: layer.circumference,
-        boundingRadius: layer.boundingRadius,
-        centroid: layer.centroid.toArray() as [number, number, number],
-        segments: layer.segments.map((segment) => ({
-          start: segment.start.toArray() as [number, number, number],
-          end: segment.end.toArray() as [number, number, number]
-        }))
-      }))
-    };
+    const transfers: ArrayBuffer[] = [payload.positions];
+    if (payload.indices) {
+      transfers.push(payload.indices);
+    }
+
+    return transfer(
+      {
+        layers: layers.map((layer) => ({
+          elevation: layer.elevation,
+          area: layer.area,
+          circumference: layer.circumference,
+          boundingRadius: layer.boundingRadius,
+          centroid: layer.centroid.toArray() as [number, number, number],
+          segments: layer.segments.map((segment) => ({
+            start: segment.start.toArray() as [number, number, number],
+            end: segment.end.toArray() as [number, number, number]
+          }))
+        })),
+        positions: payload.positions,
+        indices: payload.indices
+      },
+      transfers
+    );
   }
 };
 

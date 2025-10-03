@@ -64,7 +64,9 @@ describe('useViewerStore worker integration', () => {
     const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
     mocks.computeGeometryMock.mockResolvedValue({
       positions,
+      positionsBuffer: positions.buffer,
       indices: undefined,
+      indicesBuffer: undefined,
       metrics: {
         boundingBox: { min: [-0.5, -0.5, -0.0], max: [0.5, 0.5, 0.0] },
         size: [1, 1, 0],
@@ -73,7 +75,7 @@ describe('useViewerStore worker integration', () => {
         center: [0, 0, 0]
       }
     });
-    mocks.computeGeometryLayersMock.mockResolvedValue({
+    mocks.computeGeometryLayersMock.mockImplementation(async (request) => ({
       layers: [
         {
           elevation: 0,
@@ -89,8 +91,12 @@ describe('useViewerStore worker integration', () => {
           ]
         }
       ],
-      volume: 1
-    });
+      volume: 1,
+      positions: request.positions,
+      positionsBuffer: request.positionsBuffer ?? request.positions.buffer,
+      indices: request.indices,
+      indicesBuffer: request.indicesBuffer ?? request.indices?.buffer
+    }));
     mocks.computeEstimateMock.mockResolvedValue({
       breakdown: {
         volumeModel_mm3: 1,
@@ -121,6 +127,7 @@ describe('useViewerStore worker integration', () => {
     expect(mocks.computeGeometryLayersMock).toHaveBeenCalledTimes(1);
     const [geometryRequest] = mocks.computeGeometryLayersMock.mock.calls[0];
     expect(geometryRequest.positions).toBeInstanceOf(Float32Array);
+    expect(geometryRequest.positionsBuffer).toBeInstanceOf(ArrayBuffer);
     expect(mocks.computeEstimateMock).toHaveBeenCalledTimes(1);
     expect(mocks.computeEstimateMock).toHaveBeenCalledWith(0.5);
 

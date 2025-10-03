@@ -29,7 +29,9 @@ export interface GcodeOverrideState {
 
 interface GeometryPayload {
   positions: Float32Array;
+  positionsBuffer: ArrayBuffer;
   indices?: Uint32Array;
+  indicesBuffer?: ArrayBuffer;
   metrics?: GeometryMetrics;
 }
 
@@ -100,7 +102,9 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
       await get().setGeometry(geometry, file.name, file, {
         positions,
+        positionsBuffer: response.positionsBuffer,
         indices,
+        indicesBuffer: response.indicesBuffer,
         metrics: response.metrics
       });
     } catch (error) {
@@ -119,11 +123,16 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   ) {
     let positions: Float32Array | undefined;
     let indices: Uint32Array | undefined;
+    let positionsBuffer: ArrayBuffer | undefined;
+    let indicesBuffer: ArrayBuffer | undefined;
     let metrics = analysis?.metrics;
 
     if (analysis) {
       positions = analysis.positions;
+      positionsBuffer = analysis.positionsBuffer ?? analysis.positions.buffer;
       indices = analysis.indices;
+      indicesBuffer = analysis.indicesBuffer ?? analysis.indices?.buffer;
+      metrics = analysis.metrics;
     } else {
       const positionAttribute = geometry.getAttribute('position');
       if (!positionAttribute) {
@@ -131,8 +140,10 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         return;
       }
       positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
+      positionsBuffer = positions.buffer;
       const index = geometry.getIndex();
       indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
+      indicesBuffer = indices ? indices.buffer : undefined;
     }
 
     if (!positions) {
@@ -145,7 +156,13 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     set({
       geometry,
       fileName,
-      geometryPayload: { positions, indices, metrics },
+      geometryPayload: {
+        positions,
+        positionsBuffer: positionsBuffer ?? positions.buffer,
+        indices,
+        indicesBuffer: indicesBuffer ?? indices?.buffer,
+        metrics
+      },
       geometryMetrics: metrics,
       geometryCenter: centerVector,
       geometrySource: source,
@@ -188,13 +205,32 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       const estimateResponsePromise =
         metricsVolume !== undefined ? computeEstimate(metricsVolume) : undefined;
 
-      const { layers: rawLayers, volume } = await computeGeometryLayers(
+      const {
+        layers: rawLayers,
+        volume,
+        positions: refreshedPositions,
+        positionsBuffer: refreshedPositionsBuffer,
+        indices: refreshedIndices,
+        indicesBuffer: refreshedIndicesBuffer
+      } = await computeGeometryLayers(
         {
           positions: payload.positions,
-          indices: payload.indices
+          positionsBuffer: payload.positionsBuffer,
+          indices: payload.indices,
+          indicesBuffer: payload.indicesBuffer
         },
         parameters
       );
+
+      const geometry = get().geometry;
+      if (geometry) {
+        geometry.setAttribute('position', new Float32BufferAttribute(refreshedPositions, 3));
+        if (refreshedIndices) {
+          geometry.setIndex(new Uint32BufferAttribute(refreshedIndices, 1));
+        } else {
+          geometry.setIndex(null);
+        }
+      }
 
       const volumeModel_mm3 = metricsVolume ?? volume;
       const estimateResponse =
@@ -239,7 +275,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         layers,
         summary,
         estimateBreakdown: baseBreakdown,
-        effectiveBreakdown
+        effectiveBreakdown,
+        geometryPayload: {
+          positions: refreshedPositions,
+          positionsBuffer: refreshedPositionsBuffer,
+          indices: refreshedIndices,
+          indicesBuffer: refreshedIndicesBuffer,
+          metrics: payload.metrics
+        }
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
