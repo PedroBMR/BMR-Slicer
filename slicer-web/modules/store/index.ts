@@ -19,6 +19,7 @@ import {
   type GeometryMetrics
 } from '../../lib/compute';
 import { parseAndEstimate } from '../../lib/gcode';
+import { createIdleScheduler } from './idleScheduler';
 
 export interface GcodeOverrideState {
   fileName: string;
@@ -71,6 +72,8 @@ export interface ViewerStoreActions {
 }
 
 export type ViewerStore = ViewerStoreState & ViewerStoreActions;
+
+const recomputeScheduler = createIdleScheduler();
 
 export const useViewerStore = create<ViewerStore>((set, get) => ({
   layers: [],
@@ -174,14 +177,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       gcodeLoading: false,
       gcodeError: undefined
     });
-    await get().recompute();
+    await recomputeScheduler.schedule(() => get().recompute(), { immediate: true });
   },
 
   async setParameters(parameters: Partial<EstimateParameters>) {
     const next = { ...get().parameters, ...parameters };
     set({ parameters: next });
     if (get().geometryPayload) {
-      await get().recompute();
+      await recomputeScheduler.schedule(() => get().recompute());
     }
   },
 
@@ -395,6 +398,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   },
 
   reset() {
+    recomputeScheduler.cancel();
     set({
       geometry: undefined,
       layers: [],
