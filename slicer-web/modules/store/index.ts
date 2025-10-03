@@ -28,7 +28,7 @@ export interface GcodeOverrideState {
   loadedAt: number;
 }
 
-interface GeometryPayload {
+export interface GeometryPayload {
   positions: Float32Array;
   positionsBuffer: ArrayBuffer;
   indices?: Uint32Array;

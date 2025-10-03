@@ -19,13 +19,14 @@ import {
   Object3D,
   PerspectiveCamera,
   Scene,
+  Uint32BufferAttribute,
   Vector3,
   WebGLRenderer
 } from 'three';
-import { OrbitControls, STLLoader, ThreeMFLoader } from 'three-stdlib';
+import { OrbitControls } from 'three-stdlib';
 
 import type { LayerEstimate } from '../modules/estimate';
-import { useViewerStore } from '../modules/store';
+import { useViewerStore, type GeometryPayload } from '../modules/store';
 
 export interface GeometryInfo {
   bbox: { min: [number, number, number]; max: [number, number, number] };
@@ -68,6 +69,7 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
 
   const source = externalSource ?? geometrySource;
   const geometry = externalGeometry ?? storeGeometry;
+  const geometryPayload = useViewerStore((state) => state.geometryPayload);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -180,11 +182,13 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
       }
 
       try {
-        const object = source
-          ? await loadObjectFromSource(source)
-          : geometry
-              ? createMeshFromGeometry(geometry)
-              : null;
+        const object = geometry
+          ? createMeshFromGeometry(geometry)
+          : geometryPayload
+              ? createMeshFromPayload(geometryPayload)
+              : source
+                  ? await loadObjectFromSource(source)
+                  : null;
 
         if (!object || disposed) {
           return;
@@ -242,7 +246,7 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
     return () => {
       disposed = true;
     };
-  }, [geometry, onGeometryInfo, source]);
+  }, [geometry, geometryPayload, onGeometryInfo, source]);
 
   useEffect(() => {
     if (geometry || source) {
@@ -415,12 +419,33 @@ async function loadObjectFromSource(source: ArrayBuffer | File): Promise<Object3
     (signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04);
 
   if (isThreeMF) {
+    const { ThreeMFLoader } = await import('three-stdlib');
     const loader = new ThreeMFLoader();
     return loader.parse(buffer);
   }
 
+  const { STLLoader } = await import('three-stdlib');
   const loader = new STLLoader();
   const geometry = loader.parse(buffer);
+  geometry.computeVertexNormals();
+  const material = new MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.05, roughness: 0.85 });
+  return new Mesh(geometry, material);
+}
+
+function createMeshFromPayload(payload: GeometryPayload): Mesh {
+  const geometry = new BufferGeometry();
+  const positions = payload.positionsBuffer
+    ? new Float32Array(payload.positionsBuffer)
+    : payload.positions;
+  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+
+  const indexSource = payload.indicesBuffer
+    ? new Uint32Array(payload.indicesBuffer)
+    : payload.indices;
+  if (indexSource) {
+    geometry.setIndex(new Uint32BufferAttribute(indexSource, 1));
+  }
+
   geometry.computeVertexNormals();
   const material = new MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.05, roughness: 0.85 });
   return new Mesh(geometry, material);
