@@ -24,9 +24,7 @@ export class ViewerErrorBoundary extends Component<
 
   static getDerivedStateFromError(error: unknown): ViewerErrorBoundaryState {
     const message =
-      error instanceof Error && error.message
-        ? error.message
-        : 'An unexpected error occurred.';
+      error instanceof Error && error.message ? error.message : 'An unexpected error occurred.';
 
     return { hasError: true, errorMessage: message };
   }
@@ -54,7 +52,7 @@ export class ViewerErrorBoundary extends Component<
             padding: '1.5rem',
             borderRadius: '0.75rem',
             backgroundColor: 'rgba(30, 41, 59, 0.6)',
-            border: '1px solid rgba(148, 163, 184, 0.4)'
+            border: '1px solid rgba(148, 163, 184, 0.4)',
           }}
         >
           <div>
@@ -79,7 +77,7 @@ export class ViewerErrorBoundary extends Component<
               backgroundColor: '#38bdf8',
               color: '#0f172a',
               fontWeight: 600,
-              cursor: 'pointer'
+              cursor: 'pointer',
             }}
           >
             Try again

@@ -2,11 +2,7 @@
 
 import { useMemo } from 'react';
 
-import {
-  exportSummary,
-  exportSummaryAsPdf,
-  exportSummaryAsXlsx
-} from '../modules/export';
+import { exportSummary, exportSummaryAsPdf, exportSummaryAsXlsx } from '../modules/export';
 import { useViewerStore } from '../modules/store';
 
 export function EstimateSummary() {
@@ -23,7 +19,7 @@ export function EstimateSummary() {
       { label: 'Volume', value: `${summary.volume.toFixed(2)} mm³` },
       { label: 'Mass', value: `${summary.mass.toFixed(2)} g` },
       { label: 'Resin cost', value: `${summary.resinCost.toFixed(2)} currency` },
-      { label: 'Estimated duration', value: `${summary.durationMinutes.toFixed(1)} minutes` }
+      { label: 'Estimated duration', value: `${summary.durationMinutes.toFixed(1)} minutes` },
     ];
   }, [summary]);
 
@@ -35,7 +31,7 @@ export function EstimateSummary() {
           padding: '2rem',
           borderRadius: '1rem',
           background: 'rgba(15, 23, 42, 0.5)',
-          color: '#94a3b8'
+          color: '#94a3b8',
         }}
       >
         Load a mesh to generate a print estimate.
@@ -52,7 +48,7 @@ export function EstimateSummary() {
         background: 'rgba(15, 23, 42, 0.65)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem'
+        gap: '1.5rem',
       }}
     >
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -74,7 +70,7 @@ export function EstimateSummary() {
               border: 'none',
               background: '#38bdf8',
               color: '#0f172a',
-              fontWeight: 600
+              fontWeight: 600,
             }}
           >
             Export JSON & CSV
@@ -88,7 +84,7 @@ export function EstimateSummary() {
               border: '1px solid rgba(148, 163, 184, 0.4)',
               background: 'transparent',
               color: '#f8fafc',
-              fontWeight: 600
+              fontWeight: 600,
             }}
           >
             Download XLSX
@@ -102,7 +98,7 @@ export function EstimateSummary() {
               border: '1px solid rgba(148, 163, 184, 0.4)',
               background: 'transparent',
               color: '#f8fafc',
-              fontWeight: 600
+              fontWeight: 600,
             }}
           >
             Download PDF
@@ -113,7 +109,7 @@ export function EstimateSummary() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '1rem'
+          gap: '1rem',
         }}
       >
         {metrics.map((metric) => (

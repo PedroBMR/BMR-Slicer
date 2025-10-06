@@ -24,12 +24,15 @@ describe('fdm estimate calculations', () => {
     const excessiveFlowParams = {
       targetFlow_mm3_s: 100,
       mvf: DEFAULT_PRINT_PARAMS.mvf,
-      overhead: 0
+      overhead: 0,
     } as const;
 
     const breakdown = estimateAll(volumeModel_mm3, excessiveFlowParams);
-    const expectedExtrudedVolume = volumeModel_mm3 *
-      (DEFAULT_PRINT_PARAMS.infill + DEFAULT_PRINT_PARAMS.wallFactor + DEFAULT_PRINT_PARAMS.topBottomFactor);
+    const expectedExtrudedVolume =
+      volumeModel_mm3 *
+      (DEFAULT_PRINT_PARAMS.infill +
+        DEFAULT_PRINT_PARAMS.wallFactor +
+        DEFAULT_PRINT_PARAMS.topBottomFactor);
     const expectedTime = expectedExtrudedVolume / DEFAULT_PRINT_PARAMS.mvf;
 
     expect(breakdown.params.targetFlow_mm3_s).toBe(excessiveFlowParams.targetFlow_mm3_s);
@@ -42,7 +45,7 @@ describe('fdm estimate calculations', () => {
     const baseParams = {
       targetFlow_mm3_s: DEFAULT_PRINT_PARAMS.targetFlow_mm3_s,
       mvf: DEFAULT_PRINT_PARAMS.mvf,
-      overhead: 0
+      overhead: 0,
     } as const;
 
     const baseline = estimateAll(volumeModel_mm3, baseParams);

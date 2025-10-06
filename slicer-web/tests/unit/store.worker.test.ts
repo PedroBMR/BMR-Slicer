@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     computeGeometryMock: vi.fn(),
     computeGeometryLayersMock: vi.fn(),
     computeEstimateMock: vi.fn(),
-    parseAndEstimateMock: vi.fn()
+    parseAndEstimateMock: vi.fn(),
   };
 });
 
@@ -18,11 +18,11 @@ vi.mock('../../lib/compute', () => ({
   computeGeometryLayers: mocks.computeGeometryLayersMock,
   computeEstimate: mocks.computeEstimateMock,
   releaseGeometryCompute: vi.fn(),
-  releaseEstimateCompute: vi.fn()
+  releaseEstimateCompute: vi.fn(),
 }));
 
 vi.mock('../../lib/gcode', () => ({
-  parseAndEstimate: mocks.parseAndEstimateMock
+  parseAndEstimate: mocks.parseAndEstimateMock,
 }));
 
 describe('useViewerStore worker integration', () => {
@@ -56,7 +56,7 @@ describe('useViewerStore worker integration', () => {
       loadGcode: useViewerStore.getState().loadGcode,
       clearGcodeOverride: useViewerStore.getState().clearGcodeOverride,
       reset: useViewerStore.getState().reset,
-      disposeWorkers: useViewerStore.getState().disposeWorkers
+      disposeWorkers: useViewerStore.getState().disposeWorkers,
     });
   });
 
@@ -72,8 +72,8 @@ describe('useViewerStore worker integration', () => {
         size: [1, 1, 0],
         triangleCount: 1,
         volume: { signed: 0.5, absolute: 0.5 },
-        center: [0, 0, 0]
-      }
+        center: [0, 0, 0],
+      },
     });
     mocks.computeGeometryLayersMock.mockImplementation(async (request) => ({
       layers: [
@@ -86,16 +86,16 @@ describe('useViewerStore worker integration', () => {
           segments: [
             {
               start: [0, 0, 0] as [number, number, number],
-              end: [1, 0, 0] as [number, number, number]
-            }
-          ]
-        }
+              end: [1, 0, 0] as [number, number, number],
+            },
+          ],
+        },
       ],
       volume: 1,
       positions: request.positions,
       positionsBuffer: request.positionsBuffer ?? request.positions.buffer,
       indices: request.indices,
-      indicesBuffer: request.indicesBuffer ?? request.indices?.buffer
+      indicesBuffer: request.indicesBuffer ?? request.indices?.buffer,
     }));
     mocks.computeEstimateMock.mockResolvedValue({
       breakdown: {
@@ -109,10 +109,10 @@ describe('useViewerStore worker integration', () => {
           energy: 0.5,
           maintenance: 0.25,
           margin: 0.1,
-          total: 1.85
+          total: 1.85,
         },
-        params: DEFAULT_PRINT_PARAMS
-      }
+        params: DEFAULT_PRINT_PARAMS,
+      },
     });
 
     const fileBuffer = new ArrayBuffer(8);
@@ -140,7 +140,7 @@ describe('useViewerStore worker integration', () => {
   it('prevents loading files larger than the maximum size', async () => {
     const file = new File(['dummy'], 'too-large.stl', { type: 'model/stl' });
     Object.defineProperty(file, 'size', {
-      get: () => MAX_FILE_SIZE_BYTES + 1
+      get: () => MAX_FILE_SIZE_BYTES + 1,
     });
 
     await useViewerStore.getState().loadFile(file);
@@ -163,9 +163,9 @@ describe('useViewerStore worker integration', () => {
         energy: 0.5,
         maintenance: 0.25,
         margin: 0.1,
-        total: 1.85
+        total: 1.85,
       },
-      params: DEFAULT_PRINT_PARAMS
+      params: DEFAULT_PRINT_PARAMS,
     };
 
     useViewerStore.setState({
@@ -174,10 +174,10 @@ describe('useViewerStore worker integration', () => {
         volume: baseBreakdown.volumeModel_mm3,
         mass: baseBreakdown.mass_g,
         resinCost: baseBreakdown.costs.total,
-        durationMinutes: baseBreakdown.time_s / 60
+        durationMinutes: baseBreakdown.time_s / 60,
       },
       estimateBreakdown: baseBreakdown,
-      effectiveBreakdown: baseBreakdown
+      effectiveBreakdown: baseBreakdown,
     });
 
     const file = new File(['G1 X1 Y1 F1200'], 'override.gcode', { type: 'text/plain' });
@@ -215,7 +215,7 @@ describe('useViewerStore worker integration', () => {
         positions,
         positionsBuffer: positions.buffer,
         indices: undefined,
-        indicesBuffer: undefined
+        indicesBuffer: undefined,
       });
 
       mocks.computeEstimateMock.mockResolvedValue({
@@ -230,10 +230,10 @@ describe('useViewerStore worker integration', () => {
             energy: 0.5,
             maintenance: 0.25,
             margin: 0.1,
-            total: 1.85
+            total: 1.85,
           },
-          params: DEFAULT_PRINT_PARAMS
-        }
+          params: DEFAULT_PRINT_PARAMS,
+        },
       });
 
       useViewerStore.setState({
@@ -241,8 +241,8 @@ describe('useViewerStore worker integration', () => {
           positions,
           positionsBuffer: positions.buffer,
           indices: undefined,
-          indicesBuffer: undefined
-        }
+          indicesBuffer: undefined,
+        },
       });
 
       const promise1 = useViewerStore.getState().setParameters({ layerHeight_mm: 0.1 });

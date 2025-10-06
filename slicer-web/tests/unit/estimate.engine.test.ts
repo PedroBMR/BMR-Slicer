@@ -9,8 +9,7 @@ describe('estimate engine integrity checks', () => {
     const breakdown = estimateAll(volumeModel_mm3, { material: 'PLA' });
     const params = breakdown.params;
 
-    const volumeFactors =
-      params.infill + params.wallFactor + params.topBottomFactor;
+    const volumeFactors = params.infill + params.wallFactor + params.topBottomFactor;
     const expectedExtrudedVolume = volumeModel_mm3 * volumeFactors;
 
     // Mass validation

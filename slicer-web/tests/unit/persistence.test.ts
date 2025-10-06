@@ -16,9 +16,9 @@ describe('saved estimates store without IndexedDB', () => {
         energy: 2,
         maintenance: 1,
         margin: 2,
-        total: 10
+        total: 10,
       },
-      params: DEFAULT_PRINT_PARAMS
+      params: DEFAULT_PRINT_PARAMS,
     };
 
     const result = await useSavedEstimatesStore.getState().saveEstimate({
@@ -26,7 +26,7 @@ describe('saved estimates store without IndexedDB', () => {
       material: DEFAULT_PRINT_PARAMS.material,
       params: DEFAULT_PRINT_PARAMS,
       volume_mm3: breakdown.volumeModel_mm3,
-      results: breakdown
+      results: breakdown,
     });
 
     expect(result).toBeUndefined();

@@ -12,6 +12,6 @@ export function createWorkerHandle<T>(url: URL): WorkerHandle<T> {
   return {
     proxy,
     worker,
-    terminate: () => worker.terminate()
+    terminate: () => worker.terminate(),
   };
 }

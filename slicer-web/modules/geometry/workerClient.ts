@@ -7,7 +7,7 @@ let handle: WorkerHandle<GeometryWorkerApi> | undefined;
 export function getGeometryWorkerHandle(): WorkerHandle<GeometryWorkerApi> {
   if (!handle) {
     handle = createWorkerHandle<GeometryWorkerApi>(
-      new URL('../../workers/geometry.worker.ts', import.meta.url)
+      new URL('../../workers/geometry.worker.ts', import.meta.url),
     );
   }
   return handle;

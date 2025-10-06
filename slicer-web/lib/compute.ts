@@ -1,18 +1,28 @@
 import { transfer } from 'comlink';
 
-import type { EstimateParameters } from '../modules/estimate';
-import type { GeometryWorkerApi, GeometryMetrics } from '../workers/geometry.worker';
-import type { EstimateWorkerApi, EstimateWorkerResponse } from '../workers/estimate.worker';
-import type { PrintParams } from './estimate';
 import { createWorkerHandle, type WorkerHandle } from './worker-factory';
+
+import type { PrintParams } from './estimate';
+import type { EstimateParameters } from '../modules/estimate';
+import type { EstimateWorkerApi, EstimateWorkerResponse } from '../workers/estimate.worker';
+import type { GeometryMetrics, GeometryWorkerApi } from '../workers/geometry.worker';
 
 let geometryHandle: WorkerHandle<GeometryWorkerApi> | undefined;
 let estimateHandle: WorkerHandle<EstimateWorkerApi> | undefined;
 
+function toTransferableBuffer(bufferLike: ArrayBufferLike): ArrayBuffer {
+  if (bufferLike instanceof ArrayBuffer) {
+    return bufferLike;
+  }
+  const copy = new ArrayBuffer(bufferLike.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(bufferLike));
+  return copy;
+}
+
 function getGeometryWorkerHandle(): WorkerHandle<GeometryWorkerApi> {
   if (!geometryHandle) {
     geometryHandle = createWorkerHandle<GeometryWorkerApi>(
-      new URL('../workers/geometry.worker.ts', import.meta.url)
+      new URL('../workers/geometry.worker.ts', import.meta.url),
     );
   }
 
@@ -22,7 +32,7 @@ function getGeometryWorkerHandle(): WorkerHandle<GeometryWorkerApi> {
 function getEstimateWorkerHandle(): WorkerHandle<EstimateWorkerApi> {
   if (!estimateHandle) {
     estimateHandle = createWorkerHandle<EstimateWorkerApi>(
-      new URL('../workers/estimate.worker.ts', import.meta.url)
+      new URL('../workers/estimate.worker.ts', import.meta.url),
     );
   }
 
@@ -75,10 +85,10 @@ export async function computeGeometry(file: File): Promise<GeometryComputationRe
       {
         buffer,
         fileName: file.name,
-        mimeType: file.type
+        mimeType: file.type,
       },
-      [buffer]
-    )
+      [buffer],
+    ),
   );
 
   return {
@@ -86,16 +96,18 @@ export async function computeGeometry(file: File): Promise<GeometryComputationRe
     positionsBuffer: response.positions,
     indices: response.indices ? new Uint32Array(response.indices) : undefined,
     indicesBuffer: response.indices,
-    metrics: response.metrics
+    metrics: response.metrics,
   };
 }
 
 export async function computeGeometryLayers(
   payload: GeometryLayerRequestPayload,
-  parameters: EstimateParameters
+  parameters: EstimateParameters,
 ): Promise<GeometryLayerResult> {
-  const positionsBuffer = payload.positionsBuffer ?? payload.positions.buffer;
-  const indicesBuffer = payload.indices ? payload.indicesBuffer ?? payload.indices.buffer : undefined;
+  const positionsBuffer = payload.positionsBuffer ?? toTransferableBuffer(payload.positions.buffer);
+  const indicesBuffer = payload.indices
+    ? (payload.indicesBuffer ?? toTransferableBuffer(payload.indices.buffer))
+    : undefined;
   const handle = getGeometryWorkerHandle();
   const transferables: ArrayBuffer[] = [positionsBuffer];
   if (indicesBuffer) {
@@ -107,15 +119,15 @@ export async function computeGeometryLayers(
       {
         positions: positionsBuffer,
         indices: indicesBuffer,
-        parameters
+        parameters,
       },
-      transferables
-    )
+      transferables,
+    ),
   );
 
   const volume = response.layers.reduce(
     (acc, layer) => acc + layer.area * parameters.layerHeight,
-    0
+    0,
   );
 
   return {
@@ -124,13 +136,13 @@ export async function computeGeometryLayers(
     positions: new Float32Array(response.positions),
     positionsBuffer: response.positions,
     indices: response.indices ? new Uint32Array(response.indices) : undefined,
-    indicesBuffer: response.indices
+    indicesBuffer: response.indices,
   };
 }
 
 export async function computeEstimate(
   volumeModel_mm3: number,
-  params?: Partial<PrintParams>
+  params?: Partial<PrintParams>,
 ): Promise<EstimateWorkerResponse> {
   const handle = getEstimateWorkerHandle();
   return handle.proxy.estimate({ volumeModel_mm3, params });

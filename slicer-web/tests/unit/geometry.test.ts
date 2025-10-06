@@ -11,7 +11,7 @@ describe('geometry slicing', () => {
 
     const summary = sliceGeometry(geometry, {
       origin: new Vector3(0, 0, 0),
-      normal: new Vector3(0, 1, 0)
+      normal: new Vector3(0, 1, 0),
     });
 
     const expectedArea = Math.PI * radius * radius;

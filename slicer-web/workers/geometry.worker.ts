@@ -1,12 +1,20 @@
 import { expose, transfer } from 'comlink';
 import { unzipSync } from 'fflate';
-import { Box3, BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
-import { BufferGeometryUtils, STLLoader, ThreeMFLoader } from 'three-stdlib';
+import {
+  Box3,
+  BufferGeometry,
+  Float32BufferAttribute,
+  Mesh,
+  Object3D,
+  Uint32BufferAttribute,
+  Vector3,
+} from 'three';
+import { mergeBufferGeometries, STLLoader, ThreeMFLoader } from 'three-stdlib';
 
 const THREE_MF_MIME_TYPES = new Set([
   'model/3mf',
   'application/vnd.ms-3mfdocument',
-  'application/vnd.ms-package.3dmanufacturing-3dmodel'
+  'application/vnd.ms-package.3dmanufacturing-3dmodel',
 ]);
 
 const THREE_MF_UNITS_TO_MM: Record<string, number> = {
@@ -16,8 +24,21 @@ const THREE_MF_UNITS_TO_MM: Record<string, number> = {
   centimeter: 10,
   inch: 25.4,
   foot: 304.8,
-  meter: 1000
+  meter: 1000,
 };
+
+function toArrayBuffer(bufferLike: ArrayBufferLike): ArrayBuffer {
+  if (bufferLike instanceof ArrayBuffer) {
+    return bufferLike;
+  }
+  const copy = new ArrayBuffer(bufferLike.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(bufferLike));
+  return copy;
+}
+
+function isMeshObject(object: Object3D): object is Mesh {
+  return (object as Mesh).isMesh === true;
+}
 
 import { getMeshStatistics, sliceGeometry } from '../modules/geometry';
 import { generateLayers, type EstimateParameters } from '../modules/estimate';
@@ -128,7 +149,7 @@ function extractThreeMfUnit(buffer: ArrayBuffer): string | undefined {
 
 function createGeometryFromLoader(
   buffer: ArrayBuffer,
-  request: ParseMeshRequest
+  request: ParseMeshRequest,
 ): { geometry: BufferGeometry; scale: number } {
   const isThreeMF = detectThreeMf(buffer, request.fileName, request.mimeType);
   let scale = 1;
@@ -137,18 +158,15 @@ function createGeometryFromLoader(
     const loader = new ThreeMFLoader();
     const object = loader.parse(buffer);
     const geometries: BufferGeometry[] = [];
-    object.traverse((child: unknown) => {
-      if ((child as { isMesh?: boolean; geometry?: BufferGeometry }).isMesh) {
-        const mesh = child as { geometry: BufferGeometry };
-        geometries.push(mesh.geometry.clone());
+    object.traverse((child: Object3D) => {
+      if (isMeshObject(child)) {
+        geometries.push(child.geometry.clone());
       }
     });
 
     if (geometries.length > 0) {
       const merged =
-        geometries.length === 1
-          ? geometries[0]
-          : BufferGeometryUtils.mergeGeometries(geometries, true);
+        geometries.length === 1 ? geometries[0] : mergeBufferGeometries(geometries, true);
       if (!merged) {
         throw new Error('Unable to merge 3MF mesh data.');
       }
@@ -188,15 +206,18 @@ function toParseResponse(geometry: BufferGeometry): ParseMeshResponse {
       faceCount: stats.faceCount,
       boundingBox: {
         min: stats.boundingBox.min.toArray() as [number, number, number],
-        max: stats.boundingBox.max.toArray() as [number, number, number]
-      }
-    }
+        max: stats.boundingBox.max.toArray() as [number, number, number],
+      },
+    },
   };
 }
 
 function toGeometry(payload: SliceWorkerRequest | GenerateLayersRequest): BufferGeometry {
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(payload.positions), 3));
+  geometry.setAttribute(
+    'position',
+    new Float32BufferAttribute(new Float32Array(payload.positions), 3),
+  );
   if (payload.indices) {
     geometry.setIndex(new Uint32BufferAttribute(new Uint32Array(payload.indices), 1));
   }
@@ -216,7 +237,7 @@ function geometryFromTypedArrays(positions: ArrayBuffer, indices?: ArrayBuffer):
 
 function normalizeGeometry(
   geometry: BufferGeometry,
-  scale: number
+  scale: number,
 ): { geometry: BufferGeometry; boundingBox: Box3; center: Vector3; size: Vector3 } {
   const normalized = geometry.clone();
   if (scale !== 1) {
@@ -286,14 +307,16 @@ const api = {
       ? createGeometryFromLoader(payload.buffer, {
           buffer: payload.buffer,
           fileName: payload.fileName ?? '',
-          mimeType: payload.mimeType
+          mimeType: payload.mimeType,
         })
       : { geometry: geometryFromTypedArrays(payload.positions!, payload.indices), scale: 1 };
 
-    const { geometry: normalizedGeometry, boundingBox, center, size } = normalizeGeometry(
-      sourceGeometryResult.geometry,
-      sourceGeometryResult.scale
-    );
+    const {
+      geometry: normalizedGeometry,
+      boundingBox,
+      center,
+      size,
+    } = normalizeGeometry(sourceGeometryResult.geometry, sourceGeometryResult.scale);
 
     const positionAttribute = normalizedGeometry.getAttribute('position');
     if (!positionAttribute) {
@@ -316,26 +339,28 @@ const api = {
     const metrics: GeometryMetrics = {
       boundingBox: {
         min: boundingBox.min.toArray() as [number, number, number],
-        max: boundingBox.max.toArray() as [number, number, number]
+        max: boundingBox.max.toArray() as [number, number, number],
       },
       size: size.toArray() as [number, number, number],
       triangleCount,
       volume: { signed: signedVolume, absolute: Math.abs(signedVolume) },
-      center: center.toArray() as [number, number, number]
+      center: center.toArray() as [number, number, number],
     };
 
-    const transfers: ArrayBuffer[] = [positions.buffer];
-    if (indices) {
-      transfers.push(indices.buffer);
+    const positionsBuffer = toArrayBuffer(positions.buffer);
+    const indicesBuffer = indices ? toArrayBuffer(indices.buffer) : undefined;
+    const transfers: ArrayBuffer[] = [positionsBuffer];
+    if (indicesBuffer) {
+      transfers.push(indicesBuffer);
     }
 
     return transfer(
       {
-        positions: positions.buffer,
-        indices: indices ? indices.buffer : undefined,
-        metrics
+        positions: positionsBuffer,
+        indices: indicesBuffer,
+        metrics,
       },
-      transfers
+      transfers,
     );
   },
   slice(payload: SliceWorkerRequest): SliceWorkerResponse {
@@ -343,17 +368,17 @@ const api = {
     const summary = sliceGeometry(geometry, {
       origin: new Vector3(...payload.origin),
       normal: new Vector3(...payload.normal),
-      thickness: payload.thickness
+      thickness: payload.thickness,
     });
 
     return {
       segments: summary.segments.map((segment) => ({
         start: segment.start.toArray() as [number, number, number],
-        end: segment.end.toArray() as [number, number, number]
+        end: segment.end.toArray() as [number, number, number],
       })),
       centroid: summary.centroid.toArray() as [number, number, number],
       area: summary.area,
-      boundingRadius: summary.boundingRadius
+      boundingRadius: summary.boundingRadius,
     };
   },
   generateLayers(payload: GenerateLayersRequest): GenerateLayersResponse {
@@ -375,15 +400,15 @@ const api = {
           centroid: layer.centroid.toArray() as [number, number, number],
           segments: layer.segments.map((segment) => ({
             start: segment.start.toArray() as [number, number, number],
-            end: segment.end.toArray() as [number, number, number]
-          }))
+            end: segment.end.toArray() as [number, number, number],
+          })),
         })),
         positions: payload.positions,
-        indices: payload.indices
+        indices: payload.indices,
       },
-      transfers
+      transfers,
     );
-  }
+  },
 };
 
 export type GeometryWorkerApi = typeof api;

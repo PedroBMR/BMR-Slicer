@@ -2,13 +2,9 @@
 
 import { create } from 'zustand';
 import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute, Vector3 } from 'three';
-import type {
-  EstimateBreakdown,
-  EstimateParameters,
-  EstimateSummary,
-  LayerEstimate
-} from '../estimate';
+import type { EstimateParameters, EstimateSummary, LayerEstimate } from '../estimate';
 import { DEFAULT_PARAMETERS } from '../estimate';
+import type { EstimateBreakdown } from '../../lib/estimate';
 import {
   computeEstimate,
   computeGeometry,
@@ -16,7 +12,7 @@ import {
   releaseEstimateCompute,
   releaseGeometryCompute,
   type GeometryLayerSummary,
-  type GeometryMetrics
+  type GeometryMetrics,
 } from '../../lib/compute';
 import { parseAndEstimate } from '../../lib/gcode';
 import { createIdleScheduler } from './idleScheduler';
@@ -61,7 +57,7 @@ export interface ViewerStoreActions {
     geometry: BufferGeometry,
     fileName?: string,
     source?: ArrayBuffer | File,
-    analysis?: GeometryPayload
+    analysis?: GeometryPayload,
   ) => Promise<void>;
   setParameters: (parameters: Partial<EstimateParameters>) => Promise<void>;
   recompute: () => Promise<void>;
@@ -77,6 +73,15 @@ const recomputeScheduler = createIdleScheduler();
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 export const FILE_TOO_LARGE_ERROR = 'File is too large. Please upload a file smaller than 50 MB.';
+
+function ensureArrayBuffer(buffer: ArrayBufferLike): ArrayBuffer {
+  if (buffer instanceof ArrayBuffer) {
+    return buffer;
+  }
+  const copy = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(buffer));
+  return copy;
+}
 
 export const useViewerStore = create<ViewerStore>((set, get) => ({
   layers: [],
@@ -116,7 +121,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         positionsBuffer: response.positionsBuffer,
         indices,
         indicesBuffer: response.indicesBuffer,
-        metrics: response.metrics
+        metrics: response.metrics,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -130,9 +135,9 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
     geometry: BufferGeometry,
     fileName?: string,
     source?: ArrayBuffer | File,
-    analysis?: GeometryPayload
+    analysis?: GeometryPayload,
   ) {
-    let positions: Float32Array | undefined;
+    let positions: Float32Array;
     let indices: Uint32Array | undefined;
     let positionsBuffer: ArrayBuffer | undefined;
     let indicesBuffer: ArrayBuffer | undefined;
@@ -140,9 +145,11 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
     if (analysis) {
       positions = analysis.positions;
-      positionsBuffer = analysis.positionsBuffer ?? analysis.positions.buffer;
+      positionsBuffer = analysis.positionsBuffer ?? ensureArrayBuffer(analysis.positions.buffer);
       indices = analysis.indices;
-      indicesBuffer = analysis.indicesBuffer ?? analysis.indices?.buffer;
+      indicesBuffer =
+        analysis.indicesBuffer ??
+        (analysis.indices ? ensureArrayBuffer(analysis.indices.buffer) : undefined);
       metrics = analysis.metrics;
     } else {
       const positionAttribute = geometry.getAttribute('position');
@@ -151,16 +158,17 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         return;
       }
       positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
-      positionsBuffer = positions.buffer;
+      positionsBuffer = ensureArrayBuffer(positions.buffer);
       const index = geometry.getIndex();
       indices = index ? new Uint32Array(index.array as ArrayLike<number>) : undefined;
-      indicesBuffer = indices ? indices.buffer : undefined;
+      indicesBuffer = indices ? ensureArrayBuffer(indices.buffer) : undefined;
     }
 
-    if (!positions) {
-      set({ error: 'Geometry is missing position data.' });
-      return;
-    }
+    const resolvedPositionsBuffer = positionsBuffer ?? ensureArrayBuffer(positions.buffer);
+    const resolvedIndicesBuffer =
+      indices && indices.length > 0
+        ? (indicesBuffer ?? ensureArrayBuffer(indices.buffer))
+        : undefined;
 
     const centerVector = metrics ? new Vector3(...metrics.center) : undefined;
 
@@ -169,10 +177,10 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       fileName,
       geometryPayload: {
         positions,
-        positionsBuffer: positionsBuffer ?? positions.buffer,
+        positionsBuffer: resolvedPositionsBuffer,
         indices,
-        indicesBuffer: indicesBuffer ?? indices?.buffer,
-        metrics
+        indicesBuffer: resolvedIndicesBuffer,
+        metrics,
       },
       geometryMetrics: metrics,
       geometryCenter: centerVector,
@@ -183,7 +191,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       effectiveBreakdown: undefined,
       gcodeOverride: undefined,
       gcodeLoading: false,
-      gcodeError: undefined
+      gcodeError: undefined,
     });
     await recomputeScheduler.schedule(() => get().recompute(), { immediate: true });
   },
@@ -203,7 +211,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         layers: [],
         summary: undefined,
         estimateBreakdown: undefined,
-        effectiveBreakdown: undefined
+        effectiveBreakdown: undefined,
       });
       return;
     }
@@ -222,15 +230,15 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         positions: refreshedPositions,
         positionsBuffer: refreshedPositionsBuffer,
         indices: refreshedIndices,
-        indicesBuffer: refreshedIndicesBuffer
+        indicesBuffer: refreshedIndicesBuffer,
       } = await computeGeometryLayers(
         {
           positions: payload.positions,
           positionsBuffer: payload.positionsBuffer,
           indices: payload.indices,
-          indicesBuffer: payload.indicesBuffer
+          indicesBuffer: payload.indicesBuffer,
         },
-        parameters
+        parameters,
       );
 
       const geometry = get().geometry;
@@ -257,8 +265,8 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         centroid: new Vector3(...layer.centroid),
         segments: layer.segments.map((segment) => ({
           start: new Vector3(...segment.start),
-          end: new Vector3(...segment.end)
-        }))
+          end: new Vector3(...segment.end),
+        })),
       }));
 
       const baseBreakdown = estimateResponse.breakdown;
@@ -266,7 +274,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       const effectiveBreakdown: EstimateBreakdown = {
         ...baseBreakdown,
         costs: { ...baseBreakdown.costs },
-        params: baseBreakdown.params
+        params: baseBreakdown.params,
       };
 
       if (override) {
@@ -279,7 +287,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         volume: effectiveBreakdown.volumeModel_mm3,
         mass: effectiveBreakdown.mass_g,
         resinCost: effectiveBreakdown.costs.total,
-        durationMinutes: effectiveBreakdown.time_s / 60
+        durationMinutes: effectiveBreakdown.time_s / 60,
       };
 
       set({
@@ -292,8 +300,8 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
           positionsBuffer: refreshedPositionsBuffer,
           indices: refreshedIndices,
           indicesBuffer: refreshedIndicesBuffer,
-          metrics: payload.metrics
-        }
+          metrics: payload.metrics,
+        },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -334,14 +342,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         fileName,
         time_s: estimate.time_s,
         filamentLen_mm: estimate.filamentLen_mm,
-        loadedAt: Date.now()
+        loadedAt: Date.now(),
       };
 
       set((state) => {
         const summary = state.summary
           ? {
               ...state.summary,
-              durationMinutes: estimate.time_s / 60
+              durationMinutes: estimate.time_s / 60,
             }
           : state.summary;
 
@@ -351,24 +359,24 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
               costs: { ...state.estimateBreakdown.costs },
               params: state.estimateBreakdown.params,
               time_s: override.time_s,
-              filamentLen_mm: override.filamentLen_mm
+              filamentLen_mm: override.filamentLen_mm,
             }
           : state.effectiveBreakdown
-          ? {
-              ...state.effectiveBreakdown,
-              costs: { ...state.effectiveBreakdown.costs },
-              params: state.effectiveBreakdown.params,
-              time_s: override.time_s,
-              filamentLen_mm: override.filamentLen_mm
-            }
-          : undefined;
+            ? {
+                ...state.effectiveBreakdown,
+                costs: { ...state.effectiveBreakdown.costs },
+                params: state.effectiveBreakdown.params,
+                time_s: override.time_s,
+                filamentLen_mm: override.filamentLen_mm,
+              }
+            : undefined;
 
         return {
           gcodeOverride: override,
           gcodeLoading: false,
           gcodeError: undefined,
           summary,
-          effectiveBreakdown
+          effectiveBreakdown,
         };
       });
     } catch (error) {
@@ -383,7 +391,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         state.summary && state.estimateBreakdown
           ? {
               ...state.summary,
-              durationMinutes: state.estimateBreakdown.time_s / 60
+              durationMinutes: state.estimateBreakdown.time_s / 60,
             }
           : state.summary;
 
@@ -391,7 +399,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         ? {
             ...state.estimateBreakdown,
             costs: { ...state.estimateBreakdown.costs },
-            params: state.estimateBreakdown.params
+            params: state.estimateBreakdown.params,
           }
         : undefined;
 
@@ -400,7 +408,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         gcodeLoading: false,
         gcodeError: undefined,
         summary,
-        effectiveBreakdown
+        effectiveBreakdown,
       };
     });
   },
@@ -420,12 +428,12 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       effectiveBreakdown: undefined,
       gcodeOverride: undefined,
       gcodeLoading: false,
-      gcodeError: undefined
+      gcodeError: undefined,
     });
   },
 
   disposeWorkers() {
     releaseGeometryCompute();
     releaseEstimateCompute();
-  }
+  },
 }));
