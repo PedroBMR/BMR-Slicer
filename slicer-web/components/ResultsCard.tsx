@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FEATURE_FLAGS } from '../lib/config';
-import { exportPDF, exportXLSX } from '../modules/exporters';
+import { exportPDF, exportXLSX } from '../lib/exporters';
 import { useSavedEstimatesStore } from '../modules/persistence/store';
 import { useViewerStore } from '../modules/store';
 
 import type { EstimateBreakdown } from '../lib/estimate';
+import type { ExportPDFSection, ExportRow } from '../lib/exporters';
 import type { ChangeEvent } from 'react';
 
 export interface ResultsCardProps {
@@ -49,7 +50,34 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
     return withoutExtension.length > 0 ? withoutExtension : 'estimativa';
   }, [fileName]);
 
-  const fileMeta = useMemo(() => {
+  const numberFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [],
+  );
+
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [],
+  );
+
+  const fileMeta = useMemo<
+    | {
+        name: string;
+        size?: number;
+        type?: string;
+      }
+    | undefined
+  >(() => {
     if (geometrySource instanceof File) {
       return {
         name: geometrySource.name,
@@ -180,54 +208,246 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
     if (!breakdown) {
       return;
     }
-    const rows = [
-      { Métrica: 'Nome', Valor: fileName ?? baseFileName },
-      { Métrica: 'Material', Valor: breakdown.params.material },
-      { Métrica: 'Volume (mm³)', Valor: Number(breakdown.volumeModel_mm3.toFixed(2)) },
-      { Métrica: 'Massa (g)', Valor: Number(breakdown.mass_g.toFixed(2)) },
-      { Métrica: 'Tempo (min)', Valor: Number((breakdown.time_s / 60).toFixed(2)) },
-      { Métrica: 'Filamento (m)', Valor: Number((breakdown.filamentLen_mm / 1000).toFixed(2)) },
-      { Métrica: 'Custo total (R$)', Valor: Number(breakdown.costs.total.toFixed(2)) },
-      { Métrica: 'Energia (R$)', Valor: Number(breakdown.costs.energy.toFixed(2)) },
-      { Métrica: 'Manutenção (R$)', Valor: Number(breakdown.costs.maintenance.toFixed(2)) },
-      { Métrica: 'Margem (R$)', Valor: Number(breakdown.costs.margin.toFixed(2)) },
+
+    const formatPercent = (value: number) => `${numberFormatter.format(value * 100)}%`;
+    const formatNumber = (value: number) => numberFormatter.format(value);
+    const formatCurrency = (value: number) => currencyFormatter.format(value);
+
+    const metadataRows: ExportRow[] = [
+      {
+        section: 'Arquivo',
+        metric: 'Nome',
+        value: fileMeta?.name ?? baseFileName,
+      },
     ];
-    exportXLSX(rows, { fileName: `${baseFileName}-estimativa.xlsx`, sheetName: 'Resumo' });
-  }, [baseFileName, breakdown, fileName]);
+
+    if (fileMeta?.type) {
+      metadataRows.push({
+        section: 'Arquivo',
+        metric: 'Tipo',
+        value: fileMeta.type,
+      });
+    }
+
+    if (typeof fileMeta?.size === 'number') {
+      const sizeInMb = fileMeta.size / (1024 * 1024);
+      metadataRows.push({
+        section: 'Arquivo',
+        metric: 'Tamanho',
+        value: `${formatNumber(sizeInMb)} MB`,
+      });
+    }
+
+    const params = breakdown.params;
+    const paramsRows: ExportRow[] = [
+      { section: 'Parâmetros de impressão', metric: 'Material', value: params.material },
+      { section: 'Parâmetros de impressão', metric: 'Infill', value: formatPercent(params.infill) },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Fator de parede',
+        value: formatPercent(params.wallFactor),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Fator topo/base',
+        value: formatPercent(params.topBottomFactor),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'MVF (mm³/s)',
+        value: formatNumber(params.mvf),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Fluxo alvo (mm³/s)',
+        value: formatNumber(params.targetFlow_mm3_s),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Overhead',
+        value: formatPercent(params.overhead),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Preço por kg',
+        value: formatCurrency(params.pricePerKg),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Potência (W)',
+        value: formatNumber(params.powerW),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Preço kWh',
+        value: formatCurrency(params.kwhPrice),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Manutenção por hora',
+        value: formatCurrency(params.maintPerHour),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Margem',
+        value: formatPercent(params.margin),
+      },
+      {
+        section: 'Parâmetros de impressão',
+        metric: 'Diâmetro do filamento (mm)',
+        value: formatNumber(params.filamentDiameter_mm),
+      },
+    ];
+
+    const timeMinutes = breakdown.time_s / 60;
+    const timeHours = breakdown.time_s / 3600;
+    const resultsRows: ExportRow[] = [
+      {
+        section: 'Resultados',
+        metric: 'Volume do modelo (mm³)',
+        value: formatNumber(breakdown.volumeModel_mm3),
+      },
+      {
+        section: 'Resultados',
+        metric: 'Volume extrudado (mm³)',
+        value: formatNumber(breakdown.extrudedVolume_mm3),
+      },
+      {
+        section: 'Resultados',
+        metric: 'Massa (g)',
+        value: formatNumber(breakdown.mass_g),
+      },
+      {
+        section: 'Resultados',
+        metric: 'Filamento (m)',
+        value: formatNumber(breakdown.filamentLen_mm / 1000),
+      },
+      {
+        section: 'Resultados',
+        metric: 'Tempo (min)',
+        value: formatNumber(timeMinutes),
+      },
+      {
+        section: 'Resultados',
+        metric: 'Tempo (h)',
+        value: formatNumber(timeHours),
+      },
+    ];
+
+    const costsRows: ExportRow[] = [
+      {
+        section: 'Custos',
+        metric: 'Filamento',
+        value: formatCurrency(breakdown.costs.filament),
+      },
+      {
+        section: 'Custos',
+        metric: 'Energia',
+        value: formatCurrency(breakdown.costs.energy),
+      },
+      {
+        section: 'Custos',
+        metric: 'Manutenção',
+        value: formatCurrency(breakdown.costs.maintenance),
+      },
+      {
+        section: 'Custos',
+        metric: 'Margem',
+        value: formatCurrency(breakdown.costs.margin),
+      },
+      {
+        section: 'Custos',
+        metric: 'Total',
+        value: formatCurrency(breakdown.costs.total),
+      },
+    ];
+
+    const rows: ExportRow[] = [...metadataRows, ...paramsRows, ...resultsRows, ...costsRows];
+
+    exportXLSX(rows, {
+      fileName: `${baseFileName}-estimativa.xlsx`,
+      sheetName: 'Resumo',
+      headers: {
+        section: 'Categoria',
+        metric: 'Métrica',
+        value: 'Valor',
+      },
+    });
+  }, [baseFileName, breakdown, currencyFormatter, fileMeta, numberFormatter]);
 
   const handleExportPDF = useCallback(() => {
     if (!breakdown) {
       return;
     }
-    const summary = {
-      Nome: fileName ?? baseFileName,
-      Material: breakdown.params.material,
-      'Volume (mm³)': breakdown.volumeModel_mm3.toFixed(2),
-      'Massa (g)': breakdown.mass_g.toFixed(2),
-      'Tempo (min)': (breakdown.time_s / 60).toFixed(2),
-      'Filamento (m)': (breakdown.filamentLen_mm / 1000).toFixed(2),
-      'Custo total (R$)': breakdown.costs.total.toFixed(2),
-      'Energia (R$)': breakdown.costs.energy.toFixed(2),
-      'Manutenção (R$)': breakdown.costs.maintenance.toFixed(2),
-      'Margem (R$)': breakdown.costs.margin.toFixed(2),
-    } as Record<string, string>;
-    exportPDF(summary, {
+
+    const formatPercent = (value: number) => `${numberFormatter.format(value * 100)}%`;
+    const formatNumber = (value: number) => numberFormatter.format(value);
+    const formatCurrency = (value: number) => currencyFormatter.format(value);
+
+    const metadataEntries: ExportPDFSection['entries'] = [
+      {
+        label: 'Nome',
+        value: fileMeta?.name ?? baseFileName,
+      },
+    ];
+
+    if (fileMeta?.type) {
+      metadataEntries.push({ label: 'Tipo', value: fileMeta.type });
+    }
+
+    if (typeof fileMeta?.size === 'number') {
+      const sizeInMb = fileMeta.size / (1024 * 1024);
+      metadataEntries.push({ label: 'Tamanho', value: `${formatNumber(sizeInMb)} MB` });
+    }
+
+    const params = breakdown.params;
+    const paramsEntries: ExportPDFSection['entries'] = [
+      { label: 'Material', value: params.material },
+      { label: 'Infill', value: formatPercent(params.infill) },
+      { label: 'Fator de parede', value: formatPercent(params.wallFactor) },
+      { label: 'Fator topo/base', value: formatPercent(params.topBottomFactor) },
+      { label: 'MVF (mm³/s)', value: formatNumber(params.mvf) },
+      { label: 'Fluxo alvo (mm³/s)', value: formatNumber(params.targetFlow_mm3_s) },
+      { label: 'Overhead', value: formatPercent(params.overhead) },
+      { label: 'Preço por kg', value: formatCurrency(params.pricePerKg) },
+      { label: 'Potência (W)', value: formatNumber(params.powerW) },
+      { label: 'Preço kWh', value: formatCurrency(params.kwhPrice) },
+      { label: 'Manutenção por hora', value: formatCurrency(params.maintPerHour) },
+      { label: 'Margem', value: formatPercent(params.margin) },
+      { label: 'Diâmetro do filamento (mm)', value: formatNumber(params.filamentDiameter_mm) },
+    ];
+
+    const timeMinutes = breakdown.time_s / 60;
+    const timeHours = breakdown.time_s / 3600;
+    const resultsEntries: ExportPDFSection['entries'] = [
+      { label: 'Volume do modelo (mm³)', value: formatNumber(breakdown.volumeModel_mm3) },
+      { label: 'Volume extrudado (mm³)', value: formatNumber(breakdown.extrudedVolume_mm3) },
+      { label: 'Massa (g)', value: formatNumber(breakdown.mass_g) },
+      { label: 'Filamento (m)', value: formatNumber(breakdown.filamentLen_mm / 1000) },
+      { label: 'Tempo (min)', value: formatNumber(timeMinutes) },
+      { label: 'Tempo (h)', value: formatNumber(timeHours) },
+    ];
+
+    const costsEntries: ExportPDFSection['entries'] = [
+      { label: 'Filamento', value: formatCurrency(breakdown.costs.filament) },
+      { label: 'Energia', value: formatCurrency(breakdown.costs.energy) },
+      { label: 'Manutenção', value: formatCurrency(breakdown.costs.maintenance) },
+      { label: 'Margem', value: formatCurrency(breakdown.costs.margin) },
+      { label: 'Total', value: formatCurrency(breakdown.costs.total) },
+    ];
+
+    const sections: ExportPDFSection[] = [
+      { title: 'Arquivo', entries: metadataEntries },
+      { title: 'Parâmetros de impressão', entries: paramsEntries },
+      { title: 'Resultados', entries: resultsEntries },
+      { title: 'Custos', entries: costsEntries },
+    ].filter((section) => section.entries.length > 0);
+
+    exportPDF(sections, {
       fileName: `${baseFileName}-estimativa.pdf`,
-      title: 'Resumo da estimativa',
-      order: [
-        'Nome',
-        'Material',
-        'Volume (mm³)',
-        'Massa (g)',
-        'Tempo (min)',
-        'Filamento (m)',
-        'Custo total (R$)',
-        'Energia (R$)',
-        'Manutenção (R$)',
-        'Margem (R$)',
-      ],
+      documentTitle: 'Resumo da estimativa',
     });
-  }, [baseFileName, breakdown, fileName]);
+  }, [baseFileName, breakdown, currencyFormatter, fileMeta, numberFormatter]);
 
   useEffect(() => {
     if (!feedback && !feedbackError) {
