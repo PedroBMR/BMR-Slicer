@@ -264,9 +264,9 @@ export function ParamsForm({
           filamentDiameter_mm: data.filamentDiameter_mm,
         };
 
-        const response = await worker.proxy.estimate({ volumeModel_mm3, params });
+        const breakdown = await worker.proxy.estimateAll(volumeModel_mm3, params);
         if (!cancelled) {
-          setWorkerBreakdown(response.breakdown);
+          setWorkerBreakdown(breakdown);
         }
       } catch (error) {
         if (!cancelled) {

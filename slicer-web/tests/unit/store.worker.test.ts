@@ -98,21 +98,19 @@ describe('useViewerStore worker integration', () => {
       indicesBuffer: request.indicesBuffer ?? request.indices?.buffer,
     }));
     mocks.computeEstimateMock.mockResolvedValue({
-      breakdown: {
-        volumeModel_mm3: 1,
-        extrudedVolume_mm3: 1.5,
-        mass_g: 2,
-        filamentLen_mm: 3,
-        time_s: 120,
-        costs: {
-          filament: 1,
-          energy: 0.5,
-          maintenance: 0.25,
-          margin: 0.1,
-          total: 1.85,
-        },
-        params: DEFAULT_PRINT_PARAMS,
+      volumeModel_mm3: 1,
+      extrudedVolume_mm3: 1.5,
+      mass_g: 2,
+      filamentLen_mm: 3,
+      time_s: 120,
+      costs: {
+        filament: 1,
+        energy: 0.5,
+        maintenance: 0.25,
+        margin: 0.1,
+        total: 1.85,
       },
+      params: DEFAULT_PRINT_PARAMS,
     });
 
     const fileBuffer = new ArrayBuffer(8);
@@ -219,21 +217,19 @@ describe('useViewerStore worker integration', () => {
       });
 
       mocks.computeEstimateMock.mockResolvedValue({
-        breakdown: {
-          volumeModel_mm3: 1,
-          extrudedVolume_mm3: 1.5,
-          mass_g: 2,
-          filamentLen_mm: 3,
-          time_s: 120,
-          costs: {
-            filament: 1,
-            energy: 0.5,
-            maintenance: 0.25,
-            margin: 0.1,
-            total: 1.85,
-          },
-          params: DEFAULT_PRINT_PARAMS,
+        volumeModel_mm3: 1,
+        extrudedVolume_mm3: 1.5,
+        mass_g: 2,
+        filamentLen_mm: 3,
+        time_s: 120,
+        costs: {
+          filament: 1,
+          energy: 0.5,
+          maintenance: 0.25,
+          margin: 0.1,
+          total: 1.85,
         },
+        params: DEFAULT_PRINT_PARAMS,
       });
 
       useViewerStore.setState({
