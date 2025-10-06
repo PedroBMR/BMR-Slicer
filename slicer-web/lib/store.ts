@@ -2,13 +2,9 @@
 
 import { create } from 'zustand';
 
+import { getDatabase, type EstimateFileMeta, type EstimateRecord, type PresetRecord } from './db';
+
 import type { EstimateBreakdown, Material, PrintParams } from './estimate';
-import {
-  getDatabase,
-  type EstimateFileMeta,
-  type EstimateRecord,
-  type PresetRecord,
-} from './db';
 
 export type SavedEstimate = EstimateRecord & { id: number };
 export type SavedPreset = PresetRecord & { id: number };
@@ -139,7 +135,8 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set, get) => 
 
       return id;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Não foi possível salvar a estimativa.';
+      const message =
+        error instanceof Error ? error.message : 'Não foi possível salvar a estimativa.';
       set({ error: message, saving: false });
       return undefined;
     }
