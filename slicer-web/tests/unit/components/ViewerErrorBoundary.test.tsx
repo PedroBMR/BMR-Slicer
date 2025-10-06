@@ -26,7 +26,7 @@ describe('ViewerErrorBoundary', () => {
     shouldThrow = true;
     useViewerStore.setState({
       geometry: { mock: true } as never,
-      layers: [{ id: 'layer-1' } as never]
+      layers: [{ id: 'layer-1' } as never],
     });
   });
 

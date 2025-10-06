@@ -1,7 +1,7 @@
 export const MATERIAL_DENSITIES = {
   PLA: 1.24,
   PETG: 1.27,
-  ABS: 1.04
+  ABS: 1.04,
 } as const;
 
 export type Material = keyof typeof MATERIAL_DENSITIES;
@@ -35,7 +35,7 @@ export const DEFAULT_PRINT_PARAMS: PrintParams = {
   kwhPrice: 0.12,
   maintPerHour: 2,
   margin: 0.2,
-  filamentDiameter_mm: 1.75
+  filamentDiameter_mm: 1.75,
 };
 
 export interface EstimateBreakdown {
@@ -56,12 +56,12 @@ export interface EstimateBreakdown {
 
 export function estimateAll(
   volumeModel_mm3: number,
-  params: Partial<PrintParams> = {}
+  params: Partial<PrintParams> = {},
 ): EstimateBreakdown {
   const normalized: PrintParams = {
     ...DEFAULT_PRINT_PARAMS,
     ...params,
-    material: (params.material ?? DEFAULT_PRINT_PARAMS.material).toUpperCase() as Material
+    material: (params.material ?? DEFAULT_PRINT_PARAMS.material).toUpperCase() as Material,
   };
 
   const density = MATERIAL_DENSITIES[normalized.material];
@@ -69,8 +69,7 @@ export function estimateAll(
     throw new Error(`Unsupported material: ${normalized.material}`);
   }
 
-  const volumeFactors =
-    normalized.infill + normalized.wallFactor + normalized.topBottomFactor;
+  const volumeFactors = normalized.infill + normalized.wallFactor + normalized.topBottomFactor;
   const extrudedVolume_mm3 = Math.max(0, volumeModel_mm3 * volumeFactors);
   const volumeExtruded_cm3 = extrudedVolume_mm3 / 1000;
   const mass_g = volumeExtruded_cm3 * density;
@@ -104,8 +103,8 @@ export function estimateAll(
       energy: energyCost,
       maintenance: maintenanceCost,
       margin: marginCost,
-      total: totalCost
+      total: totalCost,
     },
-    params: normalized
+    params: normalized,
   };
 }

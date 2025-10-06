@@ -16,9 +16,9 @@ describe('mergeBreakdownWithOverride', () => {
         energy: 1,
         maintenance: 2,
         margin: 3,
-        total: 16
+        total: 16,
       },
-      params: DEFAULT_PRINT_PARAMS
+      params: DEFAULT_PRINT_PARAMS,
     };
 
     const snapshot = JSON.parse(JSON.stringify(base));
@@ -45,9 +45,9 @@ describe('mergeBreakdownWithOverride', () => {
         energy: 0.5,
         maintenance: 0.25,
         margin: 0.1,
-        total: 1.85
+        total: 1.85,
       },
-      params: DEFAULT_PRINT_PARAMS
+      params: DEFAULT_PRINT_PARAMS,
     };
 
     const merged = mergeBreakdownWithOverride(base, null);

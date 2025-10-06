@@ -12,7 +12,7 @@ export interface SliceSegment {
 
 const SliceSegmentSchema = z.object({
   start: Vector3Schema,
-  end: Vector3Schema
+  end: Vector3Schema,
 });
 
 export interface SliceSummary {
@@ -26,7 +26,7 @@ const SliceSummarySchema = z.object({
   segments: z.array(SliceSegmentSchema),
   centroid: Vector3Schema,
   area: z.number().nonnegative(),
-  boundingRadius: z.number().nonnegative()
+  boundingRadius: z.number().nonnegative(),
 });
 
 export const EstimateParametersSchema = z.object({
@@ -35,7 +35,7 @@ export const EstimateParametersSchema = z.object({
   resinCostPerLiter: z.number().nonnegative(),
   exposureTimeSeconds: z.number().nonnegative(),
   liftDistance: z.number().nonnegative(),
-  liftSpeed: z.number().positive()
+  liftSpeed: z.number().positive(),
 });
 
 export interface LayerEstimate extends SliceSummary {
@@ -45,7 +45,7 @@ export interface LayerEstimate extends SliceSummary {
 
 export const LayerEstimateSchema = SliceSummarySchema.extend({
   elevation: z.number().nonnegative(),
-  circumference: z.number().nonnegative()
+  circumference: z.number().nonnegative(),
 });
 
 export interface EstimateSummary {
@@ -61,7 +61,7 @@ export const EstimateSummarySchema = z.object({
   volume: z.number().nonnegative(),
   mass: z.number().nonnegative(),
   resinCost: z.number().nonnegative(),
-  durationMinutes: z.number().nonnegative()
+  durationMinutes: z.number().nonnegative(),
 });
 
 const LayerEstimateArraySchema = z.array(LayerEstimateSchema);
@@ -74,16 +74,19 @@ export const DEFAULT_PARAMETERS: EstimateParameters = {
   resinCostPerLiter: 70,
   exposureTimeSeconds: 2.5,
   liftDistance: 6,
-  liftSpeed: 180
+  liftSpeed: 180,
 };
 
-export function integrateLayers(layers: LayerEstimate[], parameters = DEFAULT_PARAMETERS): EstimateSummary {
+export function integrateLayers(
+  layers: LayerEstimate[],
+  parameters = DEFAULT_PARAMETERS,
+): EstimateSummary {
   const safeParameters = EstimateParametersSchema.parse(parameters);
   const safeLayers = LayerEstimateArraySchema.parse(layers) as LayerEstimate[];
 
   const volume = safeLayers.reduce(
     (acc, layer) => acc + layer.area * safeParameters.layerHeight,
-    0
+    0,
   );
   const volumeMl = volume * 0.001;
   const mass = volumeMl * safeParameters.resinDensity;
@@ -91,14 +94,14 @@ export function integrateLayers(layers: LayerEstimate[], parameters = DEFAULT_PA
 
   const liftDurationPerLayer = safeParameters.liftDistance / safeParameters.liftSpeed;
   const durationMinutes =
-    (safeLayers.length * (safeParameters.exposureTimeSeconds / 60 + liftDurationPerLayer)) || 0;
+    safeLayers.length * (safeParameters.exposureTimeSeconds / 60 + liftDurationPerLayer) || 0;
 
   return EstimateSummarySchema.parse({
     layers: safeLayers,
     volume,
     mass,
     resinCost,
-    durationMinutes
+    durationMinutes,
   }) as EstimateSummary;
 }
 
@@ -109,7 +112,7 @@ export interface LayerGenerationOptions {
 
 export function generateLayers(
   geometry: BufferGeometry,
-  options: LayerGenerationOptions = {}
+  options: LayerGenerationOptions = {},
 ): LayerEstimate[] {
   const parameters = EstimateParametersSchema.parse(options.parameters ?? DEFAULT_PARAMETERS);
   const orientation = options.orientation?.clone().normalize() ?? new Vector3(0, 0, 1);
@@ -123,7 +126,11 @@ export function generateLayers(
   const min = bounds.min.clone();
   const max = bounds.max.clone();
   const extents = max.clone().sub(min);
-  const orientationAbs = new Vector3(Math.abs(orientation.x), Math.abs(orientation.y), Math.abs(orientation.z));
+  const orientationAbs = new Vector3(
+    Math.abs(orientation.x),
+    Math.abs(orientation.y),
+    Math.abs(orientation.z),
+  );
   const totalHeight = orientationAbs.dot(extents);
 
   const layerCount = Math.max(1, Math.ceil(totalHeight / parameters.layerHeight));
@@ -131,7 +138,7 @@ export function generateLayers(
   const startCorner = new Vector3(
     orientation.x >= 0 ? min.x : max.x,
     orientation.y >= 0 ? min.y : max.y,
-    orientation.z >= 0 ? min.z : max.z
+    orientation.z >= 0 ? min.z : max.z,
   );
   const normal = orientation.clone();
 
@@ -148,7 +155,7 @@ export function generateLayers(
     layers.push({
       ...summary,
       circumference,
-      elevation: distance
+      elevation: distance,
     });
   }
 
@@ -157,7 +164,7 @@ export function generateLayers(
 
 export function estimatePrint(
   geometry: BufferGeometry,
-  options: LayerGenerationOptions = {}
+  options: LayerGenerationOptions = {},
 ): EstimateSummary {
   const parameters = options.parameters ?? DEFAULT_PARAMETERS;
   const layers = generateLayers(geometry, { ...options, parameters });

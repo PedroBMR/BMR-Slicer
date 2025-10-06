@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
 
-import type { EstimateBreakdown } from '../lib/estimate';
 import { FEATURE_FLAGS } from '../lib/config';
 import { exportPDF, exportXLSX } from '../modules/exporters';
 import { useSavedEstimatesStore } from '../modules/persistence/store';
 import { useViewerStore } from '../modules/store';
+
+import type { EstimateBreakdown } from '../lib/estimate';
+import type { ChangeEvent } from 'react';
 
 export interface ResultsCardProps {
   breakdown: EstimateBreakdown | null;
@@ -28,13 +29,13 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       clearGcodeOverride: state.clearGcodeOverride,
       gcodeOverride: state.gcodeOverride,
       gcodeLoading: state.gcodeLoading,
-      gcodeError: state.gcodeError
-    })
+      gcodeError: state.gcodeError,
+    }),
   );
 
   const { saveEstimate, saving } = useSavedEstimatesStore((state) => ({
     saveEstimate: state.saveEstimate,
-    saving: state.saving
+    saving: state.saving,
   }));
 
   const gcodeInputRef = useRef<HTMLInputElement | null>(null);
@@ -53,7 +54,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       return {
         name: geometrySource.name,
         size: geometrySource.size,
-        type: geometrySource.type
+        type: geometrySource.type,
       };
     }
     if (fileName) {
@@ -101,7 +102,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       costs: breakdown.costs,
       volume: breakdown.volumeModel_mm3,
       filament: breakdown.filamentLen_mm,
-      timeMinutes: breakdown.time_s / 60
+      timeMinutes: breakdown.time_s / 60,
     };
   }, [breakdown]);
 
@@ -120,7 +121,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       }
       event.target.value = '';
     },
-    [loadGcode]
+    [loadGcode],
   );
 
   const handleCopy = useCallback(async () => {
@@ -165,7 +166,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       params: breakdown.params,
       volume_mm3: breakdown.volumeModel_mm3,
       results: breakdown,
-      fileMeta
+      fileMeta,
     });
 
     if (result !== undefined) {
@@ -189,7 +190,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       { Métrica: 'Custo total (R$)', Valor: Number(breakdown.costs.total.toFixed(2)) },
       { Métrica: 'Energia (R$)', Valor: Number(breakdown.costs.energy.toFixed(2)) },
       { Métrica: 'Manutenção (R$)', Valor: Number(breakdown.costs.maintenance.toFixed(2)) },
-      { Métrica: 'Margem (R$)', Valor: Number(breakdown.costs.margin.toFixed(2)) }
+      { Métrica: 'Margem (R$)', Valor: Number(breakdown.costs.margin.toFixed(2)) },
     ];
     exportXLSX(rows, { fileName: `${baseFileName}-estimativa.xlsx`, sheetName: 'Resumo' });
   }, [baseFileName, breakdown, fileName]);
@@ -208,7 +209,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       'Custo total (R$)': breakdown.costs.total.toFixed(2),
       'Energia (R$)': breakdown.costs.energy.toFixed(2),
       'Manutenção (R$)': breakdown.costs.maintenance.toFixed(2),
-      'Margem (R$)': breakdown.costs.margin.toFixed(2)
+      'Margem (R$)': breakdown.costs.margin.toFixed(2),
     } as Record<string, string>;
     exportPDF(summary, {
       fileName: `${baseFileName}-estimativa.pdf`,
@@ -223,8 +224,8 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
         'Custo total (R$)',
         'Energia (R$)',
         'Manutenção (R$)',
-        'Margem (R$)'
-      ]
+        'Margem (R$)',
+      ],
     });
   }, [baseFileName, breakdown, fileName]);
 
@@ -241,9 +242,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
 
   const hasBreakdown = Boolean(breakdown);
   const showGcodeControls = FEATURE_FLAGS.enableGcodeUpload && hasBreakdown;
-  const timeSourceNote = gcodeOverride
-    ? 'Tempo estimado com base no G-code carregado.'
-    : null;
+  const timeSourceNote = gcodeOverride ? 'Tempo estimado com base no G-code carregado.' : null;
 
   return (
     <section
@@ -254,7 +253,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
         padding: '1.5rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem'
+        gap: '1.5rem',
       }}
     >
       <header
@@ -263,7 +262,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '1rem',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
         }}
       >
         <div>
@@ -277,7 +276,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
             display: 'flex',
             flexWrap: 'wrap',
             justifyContent: 'flex-end',
-            gap: '0.5rem'
+            gap: '0.5rem',
           }}
         >
           <button
@@ -291,7 +290,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
               background: hasBreakdown && !saving ? '#22c55e' : 'rgba(148, 163, 184, 0.2)',
               color: hasBreakdown && !saving ? '#0f172a' : '#94a3b8',
               fontWeight: 600,
-              cursor: hasBreakdown && !saving ? 'pointer' : 'not-allowed'
+              cursor: hasBreakdown && !saving ? 'pointer' : 'not-allowed',
             }}
           >
             {saving ? 'Salvando...' : 'Salvar'}
@@ -307,7 +306,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
               background: hasBreakdown ? 'rgba(15, 23, 42, 0.6)' : 'rgba(148, 163, 184, 0.2)',
               color: hasBreakdown ? '#f8fafc' : '#94a3b8',
               fontWeight: 600,
-              cursor: hasBreakdown ? 'pointer' : 'not-allowed'
+              cursor: hasBreakdown ? 'pointer' : 'not-allowed',
             }}
           >
             Exportar XLSX
@@ -323,7 +322,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
               background: hasBreakdown ? 'rgba(15, 23, 42, 0.6)' : 'rgba(148, 163, 184, 0.2)',
               color: hasBreakdown ? '#f8fafc' : '#94a3b8',
               fontWeight: 600,
-              cursor: hasBreakdown ? 'pointer' : 'not-allowed'
+              cursor: hasBreakdown ? 'pointer' : 'not-allowed',
             }}
           >
             Exportar PDF
@@ -339,7 +338,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
               background: hasBreakdown ? '#38bdf8' : 'rgba(148, 163, 184, 0.2)',
               color: hasBreakdown ? '#0f172a' : '#94a3b8',
               fontWeight: 600,
-              cursor: hasBreakdown ? 'pointer' : 'not-allowed'
+              cursor: hasBreakdown ? 'pointer' : 'not-allowed',
             }}
           >
             {copied ? 'Copiado!' : 'Copiar JSON'}
@@ -355,7 +354,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
             gap: '0.75rem',
             background: 'rgba(15, 23, 42, 0.35)',
             borderRadius: '0.75rem',
-            padding: '1rem'
+            padding: '1rem',
           }}
         >
           <input
@@ -370,7 +369,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
               display: 'flex',
               flexWrap: 'wrap',
               gap: '0.75rem',
-              alignItems: 'center'
+              alignItems: 'center',
             }}
           >
             <button
@@ -384,7 +383,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
                 background: gcodeLoading ? 'rgba(148, 163, 184, 0.2)' : '#38bdf8',
                 color: gcodeLoading ? '#94a3b8' : '#0f172a',
                 fontWeight: 600,
-                cursor: gcodeLoading ? 'not-allowed' : 'pointer'
+                cursor: gcodeLoading ? 'not-allowed' : 'pointer',
               }}
             >
               {gcodeLoading ? 'Processando...' : 'Upload G-code'}
@@ -401,7 +400,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
                   background: 'transparent',
                   color: '#f8fafc',
                   fontWeight: 600,
-                  cursor: gcodeLoading ? 'not-allowed' : 'pointer'
+                  cursor: gcodeLoading ? 'not-allowed' : 'pointer',
                 }}
               >
                 Usar estimativa heurística
@@ -426,22 +425,16 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
         </div>
       ) : null}
 
-      {feedback ? (
-        <p style={{ color: '#4ade80', margin: 0 }}>{feedback}</p>
-      ) : null}
-      {feedbackError ? (
-        <p style={{ color: '#f97316', margin: 0 }}>{feedbackError}</p>
-      ) : null}
+      {feedback ? <p style={{ color: '#4ade80', margin: 0 }}>{feedback}</p> : null}
+      {feedbackError ? <p style={{ color: '#f97316', margin: 0 }}>{feedbackError}</p> : null}
 
-      {error ? (
-        <p style={{ color: '#f87171', margin: 0 }}>{error}</p>
-      ) : null}
+      {error ? <p style={{ color: '#f87171', margin: 0 }}>{error}</p> : null}
 
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '1rem'
+          gap: '1rem',
         }}
       >
         <Metric label="Tempo estimado" value={loading ? '---' : timeDisplay} />
@@ -452,9 +445,7 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
         <Metric
           label="Custo total"
           value={
-            loading || !formattedBreakdown
-              ? '---'
-              : `R$ ${formattedBreakdown.totalCost.toFixed(2)}`
+            loading || !formattedBreakdown ? '---' : `R$ ${formattedBreakdown.totalCost.toFixed(2)}`
           }
         />
       </div>
@@ -491,7 +482,9 @@ interface MetricProps {
 function Metric({ label, value }: MetricProps) {
   return (
     <div>
-      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#94a3b8' }}>{label}</span>
+      <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#94a3b8' }}>
+        {label}
+      </span>
       <strong style={{ display: 'block', fontSize: '1.25rem' }}>{value}</strong>
     </div>
   );
@@ -510,7 +503,7 @@ function CostItem({ label, value }: CostItemProps) {
         justifyContent: 'space-between',
         padding: '0.75rem 1rem',
         borderRadius: '0.75rem',
-        background: 'rgba(15, 23, 42, 0.4)'
+        background: 'rgba(15, 23, 42, 0.4)',
       }}
     >
       <span>{label}</span>

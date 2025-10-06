@@ -9,7 +9,9 @@ import { toPdfBlob, toXlsxBlob } from '../../modules/export';
 
 async function blobToBuffer(blob: Blob): Promise<Buffer> {
   if ('arrayBuffer' in blob) {
-    const arrayBuffer = await (blob as Blob & { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer();
+    const arrayBuffer = await (
+      blob as Blob & { arrayBuffer: () => Promise<ArrayBuffer> }
+    ).arrayBuffer();
     return Buffer.from(arrayBuffer);
   }
 
@@ -31,13 +33,13 @@ const summary: EstimateSummary = {
       area: 45.67,
       centroid: new Vector3(1.23, 4.56, 7.89),
       boundingRadius: 10,
-      segments: []
-    }
+      segments: [],
+    },
   ],
   volume: 456.7,
   mass: 123.4,
   resinCost: 67.89,
-  durationMinutes: 42.5
+  durationMinutes: 42.5,
 };
 
 describe('export helpers', () => {

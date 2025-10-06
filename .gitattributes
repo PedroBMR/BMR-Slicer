@@ -1,2 +1,27 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalize line endings for text files
+* text=auto eol=lf
+
+# Ensure shell scripts retain executable bit and LF endings
+*.sh text eol=lf
+
+# Treat Windows-specific scripts with CRLF endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files should be left untouched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.mp4 binary
+*.mov binary
+*.woff binary
+*.woff2 binary

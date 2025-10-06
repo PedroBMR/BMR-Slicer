@@ -10,10 +10,16 @@ export interface IdleScheduler {
   cancel(): void;
 }
 
-const globalObject = typeof globalThis !== 'undefined' ? (globalThis as typeof globalThis & {
-  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
-  cancelIdleCallback?: (handle: number) => void;
-}) : undefined;
+const globalObject =
+  typeof globalThis !== 'undefined'
+    ? (globalThis as typeof globalThis & {
+        requestIdleCallback?: (
+          callback: IdleRequestCallback,
+          options?: IdleRequestOptions,
+        ) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      })
+    : undefined;
 
 const requestIdle: (work: () => void) => number | ReturnType<typeof setTimeout> =
   globalObject && typeof globalObject.requestIdleCallback === 'function'
@@ -21,7 +27,11 @@ const requestIdle: (work: () => void) => number | ReturnType<typeof setTimeout> 
     : (work) => setTimeout(work, 16);
 
 const cancelIdle = (handle: number | ReturnType<typeof setTimeout>) => {
-  if (globalObject && typeof globalObject.cancelIdleCallback === 'function' && typeof handle === 'number') {
+  if (
+    globalObject &&
+    typeof globalObject.cancelIdleCallback === 'function' &&
+    typeof handle === 'number'
+  ) {
     globalObject.cancelIdleCallback(handle);
     return;
   }
@@ -56,7 +66,7 @@ export function createIdleScheduler(): IdleScheduler {
         },
         (error) => {
           reject?.(error);
-        }
+        },
       );
     } catch (error) {
       reject?.(error);
@@ -125,6 +135,6 @@ export function createIdleScheduler(): IdleScheduler {
   return {
     schedule,
     flush,
-    cancel
+    cancel,
   };
 }

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect } from 'react';
 
-import { useSavedEstimatesStore } from '../modules/persistence/store';
 import { CompareDrawer } from './CompareDrawer';
+import { useSavedEstimatesStore } from '../modules/persistence/store';
 
 export function HistoryTimeline() {
   const {
@@ -15,7 +15,7 @@ export function HistoryTimeline() {
     setCompareOpen,
     setSelection,
     clearSelection,
-    selectedIds
+    selectedIds,
   } = useSavedEstimatesStore((state) => ({
     estimates: state.estimates,
     loadEstimates: state.loadEstimates,
@@ -25,7 +25,7 @@ export function HistoryTimeline() {
     setCompareOpen: state.setCompareOpen,
     setSelection: state.setSelection,
     clearSelection: state.clearSelection,
-    selectedIds: state.selectedIds
+    selectedIds: state.selectedIds,
   }));
 
   useEffect(() => {
@@ -37,9 +37,7 @@ export function HistoryTimeline() {
 
   const openCompare = useCallback(() => {
     if (selectedCount < 2 && hasMultiple) {
-      const defaults = estimates
-        .slice(0, 2)
-        .map((estimate) => estimate.id);
+      const defaults = estimates.slice(0, 2).map((estimate) => estimate.id);
       setSelection(defaults);
     }
     setCompareOpen(true);
@@ -51,14 +49,14 @@ export function HistoryTimeline() {
       setSelection(next);
       setCompareOpen(true);
     },
-    [selectedIds, setCompareOpen, setSelection]
+    [selectedIds, setCompareOpen, setSelection],
   );
 
   const handleDelete = useCallback(
     (id: number) => {
       void deleteEstimate(id);
     },
-    [deleteEstimate]
+    [deleteEstimate],
   );
 
   if (!loading && estimates.length === 0) {
@@ -74,7 +72,7 @@ export function HistoryTimeline() {
           padding: '1.5rem',
           display: 'flex',
           flexDirection: 'column',
-          gap: '1rem'
+          gap: '1rem',
         }}
       >
         <header
@@ -83,7 +81,7 @@ export function HistoryTimeline() {
             flexWrap: 'wrap',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '0.75rem'
+            gap: '0.75rem',
           }}
         >
           <div>
@@ -92,7 +90,9 @@ export function HistoryTimeline() {
               Revise estimativas salvas e compare diferentes combinações de parâmetros.
             </p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <div
+            style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}
+          >
             <button
               type="button"
               onClick={openCompare}
@@ -101,10 +101,11 @@ export function HistoryTimeline() {
                 padding: '0.5rem 1.25rem',
                 borderRadius: '9999px',
                 border: '1px solid rgba(148, 163, 184, 0.4)',
-                background: selectedCount >= 2 || hasMultiple ? '#38bdf8' : 'rgba(148, 163, 184, 0.2)',
+                background:
+                  selectedCount >= 2 || hasMultiple ? '#38bdf8' : 'rgba(148, 163, 184, 0.2)',
                 color: selectedCount >= 2 || hasMultiple ? '#0f172a' : '#94a3b8',
                 fontWeight: 600,
-                cursor: selectedCount >= 2 || hasMultiple ? 'pointer' : 'not-allowed'
+                cursor: selectedCount >= 2 || hasMultiple ? 'pointer' : 'not-allowed',
               }}
             >
               {selectedCount > 1 ? `Comparar (${selectedCount})` : 'Comparar estimativas'}
@@ -120,7 +121,7 @@ export function HistoryTimeline() {
                   background: 'rgba(15, 23, 42, 0.6)',
                   color: '#e2e8f0',
                   fontWeight: 500,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
                 }}
               >
                 Limpar seleção
@@ -148,7 +149,9 @@ export function HistoryTimeline() {
                   padding: '0.9rem 1.1rem',
                   borderRadius: '0.85rem',
                   background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(30, 41, 59, 0.65)',
-                  border: isSelected ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent'
+                  border: isSelected
+                    ? '1px solid rgba(56, 189, 248, 0.45)'
+                    : '1px solid transparent',
                 }}
               >
                 <div
@@ -156,7 +159,7 @@ export function HistoryTimeline() {
                     display: 'flex',
                     flexWrap: 'wrap',
                     justifyContent: 'space-between',
-                    gap: '0.75rem'
+                    gap: '0.75rem',
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -165,7 +168,8 @@ export function HistoryTimeline() {
                       {new Date(estimate.createdAt).toLocaleString()} • {estimate.material}
                     </p>
                     <p style={{ margin: 0, color: '#cbd5f5', fontSize: '0.875rem' }}>
-                      Volume: {volume.toFixed(0)} mm³ • Massa: {estimate.results.mass_g.toFixed(1)} g
+                      Volume: {volume.toFixed(0)} mm³ • Massa: {estimate.results.mass_g.toFixed(1)}{' '}
+                      g
                     </p>
                   </div>
                   <div style={{ textAlign: 'right', minWidth: '120px' }}>
@@ -180,7 +184,7 @@ export function HistoryTimeline() {
                     display: 'flex',
                     flexWrap: 'wrap',
                     gap: '0.5rem',
-                    justifyContent: 'flex-end'
+                    justifyContent: 'flex-end',
                   }}
                 >
                   <button
@@ -193,7 +197,7 @@ export function HistoryTimeline() {
                       background: isSelected ? '#38bdf8' : 'transparent',
                       color: isSelected ? '#0f172a' : '#38bdf8',
                       fontWeight: 600,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     {isSelected ? 'Selecionado' : 'Comparar'}
@@ -208,7 +212,7 @@ export function HistoryTimeline() {
                       background: 'transparent',
                       color: '#f87171',
                       fontWeight: 500,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     }}
                   >
                     Excluir

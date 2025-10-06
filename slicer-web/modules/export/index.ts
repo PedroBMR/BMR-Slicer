@@ -17,14 +17,14 @@ export function toJsonBlob(summary: EstimateSummary): Blob {
       mass: summary.mass,
       resinCost: summary.resinCost,
       durationMinutes: summary.durationMinutes,
-      layers: summary.layers.length
+      layers: summary.layers.length,
     },
     layers: summary.layers.map((layer) => ({
       elevation: layer.elevation,
       area: layer.area,
       centroid: layer.centroid.toArray(),
-      circumference: layer.circumference
-    }))
+      circumference: layer.circumference,
+    })),
   };
 
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -38,8 +38,8 @@ export function toCsvBlob(layers: LayerEstimate[]): Blob {
       layer.elevation.toFixed(4),
       layer.area.toFixed(4),
       layer.circumference.toFixed(4),
-      ...layer.centroid.toArray().map((value) => value.toFixed(4))
-    ].join(',')
+      ...layer.centroid.toArray().map((value: number) => value.toFixed(4)),
+    ].join(','),
   );
 
   const content = [header, ...rows].join('\n');
@@ -65,7 +65,7 @@ function createWorkbook(summary: EstimateSummary) {
     ['Volume (mm³)', summary.volume],
     ['Mass (g)', summary.mass],
     ['Resin cost', summary.resinCost],
-    ['Estimated duration (minutes)', summary.durationMinutes]
+    ['Estimated duration (minutes)', summary.durationMinutes],
   ]);
   utils.book_append_sheet(workbook, summarySheet, 'Summary');
 
@@ -77,8 +77,8 @@ function createWorkbook(summary: EstimateSummary) {
       Circumference: layer.circumference,
       CentroidX: layer.centroid.x,
       CentroidY: layer.centroid.y,
-      CentroidZ: layer.centroid.z
-    }))
+      CentroidZ: layer.centroid.z,
+    })),
   );
   utils.book_append_sheet(workbook, layerSheet, 'Layers');
 
@@ -90,7 +90,7 @@ export function toXlsxBlob(summary: EstimateSummary): Blob {
   const arrayBuffer = write(workbook, { type: 'array', bookType: 'xlsx' });
   const buffer = toUint8Array(arrayBuffer as ArrayBuffer | Uint8Array | number[]);
   return new Blob([buffer as BlobPart], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
 
@@ -109,7 +109,7 @@ export function toPdfBlob(summary: EstimateSummary): Blob {
     ['Volume (mm³)', summary.volume.toFixed(2)],
     ['Mass (g)', summary.mass.toFixed(2)],
     ['Resin cost', summary.resinCost.toFixed(2)],
-    ['Estimated duration (minutes)', summary.durationMinutes.toFixed(1)]
+    ['Estimated duration (minutes)', summary.durationMinutes.toFixed(1)],
   ];
 
   metrics.forEach(([label, value]) => {
@@ -132,7 +132,7 @@ export function toPdfBlob(summary: EstimateSummary): Blob {
       layer.elevation.toFixed(2),
       layer.area.toFixed(2),
       layer.circumference.toFixed(2),
-      centroid
+      centroid,
     ];
     doc.text(row.join('  '), marginLeft, cursor);
     cursor += 5;

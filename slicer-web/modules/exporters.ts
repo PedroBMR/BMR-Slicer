@@ -23,7 +23,10 @@ export interface ExportPDFOptions {
   order?: string[];
 }
 
-export function exportPDF(summary: Record<string, string | number | undefined>, options: ExportPDFOptions = {}) {
+export function exportPDF(
+  summary: Record<string, string | number | undefined>,
+  options: ExportPDFOptions = {},
+) {
   const doc = new jsPDF({ compress: true });
   const marginX = 18;
   let cursorY = 24;
@@ -41,7 +44,7 @@ export function exportPDF(summary: Record<string, string | number | undefined>, 
 
   entries.forEach((entry) => {
     const value = entry.value;
-    const textValue = typeof value === 'number' ? value.toString() : value ?? '';
+    const textValue = typeof value === 'number' ? value.toString() : (value ?? '');
     doc.text(`${entry.key}: ${textValue}`, marginX, cursorY);
     cursorY += 8;
     if (cursorY > 280) {

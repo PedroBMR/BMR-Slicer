@@ -9,7 +9,7 @@ const SUPPORTED_MIME_TYPES = new Set([
   'model/stl',
   'model/3mf',
   'application/vnd.ms-3mfdocument',
-  'application/vnd.ms-package.3dmanufacturing-3dmodel'
+  'application/vnd.ms-package.3dmanufacturing-3dmodel',
 ]);
 
 function isSupportedFile(file: File): boolean {
@@ -51,7 +51,7 @@ export function FileDrop() {
       if (!isSupportedFile(file)) {
         useViewerStore.setState({
           error: 'Unsupported file type. Please upload an STL or 3MF file.',
-          loading: false
+          loading: false,
         });
         resetInput();
         return;
@@ -66,7 +66,7 @@ export function FileDrop() {
         resetInput();
       }
     },
-    [loadFile]
+    [loadFile],
   );
 
   const handleFiles = useCallback(
@@ -79,7 +79,7 @@ export function FileDrop() {
       }
       await handleFile(files[0]);
     },
-    [handleFile, loading]
+    [handleFile, loading],
   );
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function FileDrop() {
         gap: '1rem',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.5)'
+        background: 'rgba(15, 23, 42, 0.5)',
       }}
     >
       <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>Drop a mesh file to begin slicing</p>
@@ -125,7 +125,7 @@ export function FileDrop() {
           color: '#0f172a',
           fontWeight: 600,
           cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.7 : 1
+          opacity: loading ? 0.7 : 1,
         }}
       >
         {loading ? 'Loading…' : 'Choose file'}

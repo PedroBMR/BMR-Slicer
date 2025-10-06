@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Production builds
+build/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.playwright/
+
+# Environment variables
+.env*
+!.env.example
+
+# Vercel deployment
+.vercel/
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
+
+# Local runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Misc
+*.log

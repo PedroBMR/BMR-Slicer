@@ -15,7 +15,7 @@ const api = {
   estimate({ volumeModel_mm3, params }: EstimateWorkerRequest): EstimateWorkerResponse {
     const breakdown = estimateAll(volumeModel_mm3, params);
     return { breakdown };
-  }
+  },
 };
 
 export type EstimateWorkerApi = typeof api;

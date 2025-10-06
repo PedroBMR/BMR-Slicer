@@ -8,16 +8,15 @@ import {
   FILE_TOO_LARGE_ERROR,
   MAX_FILE_SIZE_BYTES,
   type ViewerStore,
-  useViewerStore
+  useViewerStore,
 } from '../../../modules/store';
 
 describe('FileDrop', () => {
   const originalLoadFile = useViewerStore.getState().loadFile;
   const originalSetState = useViewerStore.setState;
-  const loadFileMock = vi.fn<
-    Parameters<ViewerStore['loadFile']>,
-    ReturnType<ViewerStore['loadFile']>
-  >().mockResolvedValue(undefined);
+  const loadFileMock = vi
+    .fn<Parameters<ViewerStore['loadFile']>, ReturnType<ViewerStore['loadFile']>>()
+    .mockResolvedValue(undefined);
 
   beforeAll(() => {
     useViewerStore.setState = ((...args) => {
@@ -32,7 +31,7 @@ describe('FileDrop', () => {
     useViewerStore.setState({
       loadFile: loadFileMock,
       error: undefined,
-      loading: false
+      loading: false,
     });
   });
 
@@ -44,7 +43,7 @@ describe('FileDrop', () => {
     useViewerStore.setState({
       loadFile: originalLoadFile,
       error: undefined,
-      loading: false
+      loading: false,
     });
   });
 
@@ -55,7 +54,7 @@ describe('FileDrop', () => {
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
     const file = new File(['dummy'], 'large.stl', { type: 'model/stl' });
     Object.defineProperty(file, 'size', {
-      get: () => MAX_FILE_SIZE_BYTES + 1
+      get: () => MAX_FILE_SIZE_BYTES + 1,
     });
 
     await act(async () => {

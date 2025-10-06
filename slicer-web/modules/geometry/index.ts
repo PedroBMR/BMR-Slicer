@@ -64,8 +64,8 @@ export function getMeshStatistics(geometry: BufferGeometry): MeshStatistics {
     faceCount,
     boundingBox: {
       min: box?.min.clone() ?? new Vector3(),
-      max: box?.max.clone() ?? new Vector3()
-    }
+      max: box?.max.clone() ?? new Vector3(),
+    },
   };
 }
 
@@ -112,7 +112,7 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
     const points = [
       { point: v0.clone(), distance: d0 },
       { point: v1.clone(), distance: d1 },
-      { point: v2.clone(), distance: d2 }
+      { point: v2.clone(), distance: d2 },
     ];
 
     for (let edgeIndex = 0; edgeIndex < 3; edgeIndex++) {
@@ -139,14 +139,14 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
         ...localPoints.map<[number, number]>((p) => {
           const relative = p.clone().sub(origin);
           return [relative.dot(basisU), relative.dot(basisV)];
-        })
+        }),
       );
     }
   }
 
-  const centroid = intersections.reduce((acc, point) => acc.add(point), new Vector3()).divideScalar(
-    intersections.length || 1
-  );
+  const centroid = intersections
+    .reduce((acc, point) => acc.add(point), new Vector3())
+    .divideScalar(intersections.length || 1);
 
   let area = 0;
   if (projected.length >= 3) {
@@ -167,7 +167,7 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
           acc.y += y;
           return acc;
         },
-        { x: 0, y: 0 }
+        { x: 0, y: 0 },
       );
       centroid2D.x /= unique.length;
       centroid2D.y /= unique.length;
@@ -196,6 +196,6 @@ export function sliceGeometry(geometry: BufferGeometry, slice: SlicePlane): Slic
     segments,
     centroid,
     area,
-    boundingRadius
+    boundingRadius,
   };
 }

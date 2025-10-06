@@ -33,7 +33,7 @@ class SlicerDatabase extends Dexie {
     super('bmr-slicer');
     this.version(1).stores({
       estimates: '++id, createdAt, name, material',
-      presets: '++id, name'
+      presets: '++id, name',
     });
   }
 }

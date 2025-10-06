@@ -7,7 +7,7 @@ let handle: WorkerHandle<EstimateWorkerApi> | undefined;
 export function getEstimateWorkerHandle(): WorkerHandle<EstimateWorkerApi> {
   if (!handle) {
     handle = createWorkerHandle<EstimateWorkerApi>(
-      new URL('../../workers/estimate.worker.ts', import.meta.url)
+      new URL('../../workers/estimate.worker.ts', import.meta.url),
     );
   }
   return handle;

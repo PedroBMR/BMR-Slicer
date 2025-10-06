@@ -58,7 +58,7 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
         estimates: [],
         loading: false,
         initialized: true,
-        error: 'IndexedDB indisponível no navegador atual.'
+        error: 'IndexedDB indisponível no navegador atual.',
       });
       return;
     }
@@ -73,10 +73,11 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
         estimates: normalized,
         loading: false,
         initialized: true,
-        selectedIds: state.selectedIds.filter((id) => availableIds.has(id))
+        selectedIds: state.selectedIds.filter((id) => availableIds.has(id)),
       }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Falha ao carregar histórico de estimativas.';
+      const message =
+        error instanceof Error ? error.message : 'Falha ao carregar histórico de estimativas.';
       set({ loading: false, error: message });
     }
   },
@@ -98,7 +99,7 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
         params: input.params,
         volume_mm3: input.volume_mm3,
         results: input.results,
-        fileMeta: input.fileMeta
+        fileMeta: input.fileMeta,
       };
 
       const id = await db.estimates.add(record);
@@ -107,12 +108,13 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
       set((state) => ({
         estimates: [saved, ...state.estimates],
         saving: false,
-        initialized: true
+        initialized: true,
       }));
 
       return id;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Não foi possível salvar a estimativa.';
+      const message =
+        error instanceof Error ? error.message : 'Não foi possível salvar a estimativa.';
       set({ error: message, saving: false });
       return undefined;
     }
@@ -127,7 +129,7 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
     await db.estimates.delete(id);
     set((state) => ({
       estimates: state.estimates.filter((estimate) => estimate.id !== id),
-      selectedIds: state.selectedIds.filter((selected) => selected !== id)
+      selectedIds: state.selectedIds.filter((selected) => selected !== id),
     }));
   },
 
@@ -150,5 +152,5 @@ export const useSavedEstimatesStore = create<SavedEstimatesStore>((set) => ({
 
   setSelection(ids) {
     set({ selectedIds: normalizeSelection(ids) });
-  }
+  },
 }));

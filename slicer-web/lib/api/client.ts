@@ -35,7 +35,7 @@ export async function saveEstimate(request: SaveEstimateRequest): Promise<Estima
     summary: request.summary,
     parameters: request.parameters,
     geometryMetrics: request.geometryMetrics,
-    fileName: request.fileName
+    fileName: request.fileName,
   };
 
   records.push(record);

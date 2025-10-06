@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react';
 import { EstimateSummary } from '../../components/EstimateSummary';
 import { ParamsForm } from '../../components/ParamsForm';
 import { ResultsCard } from '../../components/ResultsCard';
+import { useViewerStore } from '../../modules/store';
+
 import type { EstimateBreakdown } from '../../lib/estimate';
 import type { LayerEstimate } from '../../modules/estimate';
-import { useViewerStore } from '../../modules/store';
 
 export default function EstimatesPage() {
   const layers = useViewerStore((state) => state.layers) as LayerEstimate[];
@@ -30,7 +31,7 @@ export default function EstimatesPage() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '1.5rem'
+          gap: '1.5rem',
         }}
       >
         <ParamsForm
@@ -48,7 +49,7 @@ export default function EstimatesPage() {
         style={{
           background: 'rgba(15, 23, 42, 0.55)',
           borderRadius: '1rem',
-          padding: '1.5rem'
+          padding: '1.5rem',
         }}
       >
         <h2 style={{ marginTop: 0 }}>Layer breakdown</h2>

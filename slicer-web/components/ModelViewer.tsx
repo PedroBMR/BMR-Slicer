@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import {
   AmbientLight,
   Box3,
@@ -21,12 +20,13 @@ import {
   Scene,
   Uint32BufferAttribute,
   Vector3,
-  WebGLRenderer
+  WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three-stdlib';
 
-import type { LayerEstimate } from '../modules/estimate';
 import { useViewerStore, type GeometryPayload } from '../modules/store';
+
+import type { LayerEstimate } from '../modules/estimate';
 
 export interface GeometryInfo {
   bbox: { min: [number, number, number]; max: [number, number, number] };
@@ -43,10 +43,14 @@ export interface ModelViewerProps {
 const DEFAULT_INFO: GeometryInfo = {
   bbox: { min: [0, 0, 0], max: [0, 0, 0] },
   size: [0, 0, 0],
-  triangleCount: 0
+  triangleCount: 0,
 };
 
-export function ModelViewer({ source: externalSource, geometry: externalGeometry, onGeometryInfo }: ModelViewerProps) {
+export function ModelViewer({
+  source: externalSource,
+  geometry: externalGeometry,
+  onGeometryInfo,
+}: ModelViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,13 +83,18 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
     }
 
     const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(typeof window !== 'undefined' ? window.devicePixelRatio ?? 1 : 1);
+    renderer.setPixelRatio(typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1);
     renderer.setSize(container.clientWidth || 1, container.clientHeight || 1, false);
 
     const scene = new Scene();
     scene.background = new Color(0x0f172a);
 
-    const camera = new PerspectiveCamera(45, (container.clientWidth || 1) / (container.clientHeight || 1), 0.1, 100000);
+    const camera = new PerspectiveCamera(
+      45,
+      (container.clientWidth || 1) / (container.clientHeight || 1),
+      0.1,
+      100000,
+    );
     camera.position.set(180, 140, 180);
 
     const controls = new OrbitControls(camera, canvas);
@@ -149,8 +158,7 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
       const activeGrid = gridRef.current;
       if (activeGrid) {
         activeGrid.geometry.dispose();
-        const materials = Array.isArray(activeGrid.material) ? activeGrid.material : [activeGrid.material];
-        materials.forEach((material) => material.dispose());
+        disposeMaterials(activeGrid.material);
         scene.remove(activeGrid);
       }
       scene.clear();
@@ -171,10 +179,17 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
       return;
     }
 
+    const sceneInstance = scene;
+    const rootGroupInstance = rootGroup;
+    const meshGroupInstance = meshGroup;
+    const gridInstance = grid;
+    const cameraInstance = camera;
+    const activeControls = controls;
+
     async function loadModel() {
-      clearGroup(meshGroup);
-      rootGroup.scale.setScalar(1);
-      rootGroup.position.set(0, 0, 0);
+      clearGroup(meshGroupInstance);
+      rootGroupInstance.scale.setScalar(1);
+      rootGroupInstance.position.set(0, 0, 0);
 
       if (!source && !geometry) {
         onGeometryInfo?.(DEFAULT_INFO);
@@ -185,52 +200,52 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
         const object = geometry
           ? createMeshFromGeometry(geometry)
           : geometryPayload
-              ? createMeshFromPayload(geometryPayload)
-              : source
-                  ? await loadObjectFromSource(source)
-                  : null;
+            ? createMeshFromPayload(geometryPayload)
+            : source
+              ? await loadObjectFromSource(source)
+              : null;
 
         if (!object || disposed) {
           return;
         }
 
-        meshGroup.add(object);
-        scene.updateMatrixWorld(true);
+        meshGroupInstance.add(object);
+        sceneInstance.updateMatrixWorld(true);
 
-        const initialBox = new Box3().setFromObject(meshGroup);
+        const initialBox = new Box3().setFromObject(meshGroupInstance);
         const initialSize = initialBox.getSize(new Vector3());
         const scale = determineScale(initialSize);
 
-        rootGroup.scale.setScalar(scale);
-        scene.updateMatrixWorld(true);
+        rootGroupInstance.scale.setScalar(scale);
+        sceneInstance.updateMatrixWorld(true);
 
-        const scaledBox = new Box3().setFromObject(meshGroup);
+        const scaledBox = new Box3().setFromObject(meshGroupInstance);
         const center = scaledBox.getCenter(new Vector3());
-        rootGroup.position.set(-center.x, -center.y, -center.z);
-        scene.updateMatrixWorld(true);
+        rootGroupInstance.position.set(-center.x, -center.y, -center.z);
+        sceneInstance.updateMatrixWorld(true);
 
-        const finalBox = new Box3().setFromObject(meshGroup);
+        const finalBox = new Box3().setFromObject(meshGroupInstance);
         const finalSize = finalBox.getSize(new Vector3());
 
-        const updatedGrid = rebuildGrid(scene, grid, finalBox);
+        const updatedGrid = rebuildGrid(sceneInstance, gridInstance, finalBox);
         gridRef.current = updatedGrid;
 
         const radius = Math.max(finalSize.x, finalSize.y, finalSize.z) * 0.75;
         const distance = radius > 0 ? radius * 2.5 : 250;
         const direction = new Vector3(1, 1, 1).normalize();
         const target = new Vector3(0, 0, 0);
-        camera.position.copy(target.clone().addScaledVector(direction, distance));
-        controls.target.copy(target);
-        controls.update();
+        cameraInstance.position.copy(target.clone().addScaledVector(direction, distance));
+        activeControls.target.copy(target);
+        activeControls.update();
 
-        const triangleCount = countTriangles(meshGroup);
+        const triangleCount = countTriangles(meshGroupInstance);
         onGeometryInfo?.({
           bbox: {
             min: [finalBox.min.x, finalBox.min.y, finalBox.min.z],
-            max: [finalBox.max.x, finalBox.max.y, finalBox.max.z]
+            max: [finalBox.max.x, finalBox.max.y, finalBox.max.z],
           },
           size: [finalSize.x, finalSize.y, finalSize.z],
-          triangleCount
+          triangleCount,
         });
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
@@ -281,7 +296,7 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
         segment.start.z,
         segment.end.x,
         segment.end.y,
-        segment.end.z
+        segment.end.z,
       );
     });
 
@@ -307,10 +322,14 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
           borderRadius: '1rem',
           overflow: 'hidden',
           background: 'rgba(15, 23, 42, 0.75)',
-          minHeight: '480px'
+          minHeight: '480px',
         }}
       >
-        <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} aria-label="3D model viewer" />
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+          aria-label="3D model viewer"
+        />
       </div>
       <aside
         style={{
@@ -319,14 +338,22 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
           gap: '1rem',
           background: 'rgba(15, 23, 42, 0.5)',
           borderRadius: '1rem',
-          padding: '1.5rem'
+          padding: '1.5rem',
         }}
       >
         <h2 style={{ margin: 0, fontSize: '1.125rem' }}>Layers</h2>
         {layers.length === 0 ? (
           <p style={{ color: '#94a3b8' }}>Load a mesh to inspect generated layers.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              maxHeight: '400px',
+              overflowY: 'auto',
+            }}
+          >
             {layers.map((layer, index) => (
               <LayerRow
                 key={`${layer.elevation}-${index}`}
@@ -339,11 +366,21 @@ export function ModelViewer({ source: externalSource, geometry: externalGeometry
           </div>
         )}
         {selected ? (
-          <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(148, 163, 184, 0.2)' }}>
+          <div
+            style={{
+              marginTop: 'auto',
+              paddingTop: '1rem',
+              borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+            }}
+          >
             <h3 style={{ margin: '0 0 0.5rem' }}>Selected layer</h3>
-            <p style={{ color: '#cbd5f5', margin: 0 }}>Elevation: {selected.elevation.toFixed(2)} mm</p>
+            <p style={{ color: '#cbd5f5', margin: 0 }}>
+              Elevation: {selected.elevation.toFixed(2)} mm
+            </p>
             <p style={{ color: '#cbd5f5', margin: 0 }}>Area: {selected.area.toFixed(2)} mm²</p>
-            <p style={{ color: '#cbd5f5', margin: 0 }}>Perimeter: {selected.circumference.toFixed(2)} mm</p>
+            <p style={{ color: '#cbd5f5', margin: 0 }}>
+              Perimeter: {selected.circumference.toFixed(2)} mm
+            </p>
           </div>
         ) : null}
       </aside>
@@ -372,7 +409,7 @@ function LayerRow({ layer, index, active, onSelect }: LayerRowProps) {
         border: 'none',
         background: active ? 'rgba(56, 189, 248, 0.2)' : 'rgba(30, 41, 59, 0.6)',
         color: active ? '#38bdf8' : '#e2e8f0',
-        fontSize: '0.875rem'
+        fontSize: '0.875rem',
       }}
     >
       <span>#{index + 1}</span>
@@ -398,14 +435,12 @@ function disposeObject(object: Object3D) {
     if ((child as Mesh).isMesh) {
       const mesh = child as Mesh;
       mesh.geometry.dispose();
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      materials.forEach((material) => material.dispose());
+      disposeMaterials(mesh.material);
     }
     if ((child as LineSegments).isLineSegments) {
       const line = child as LineSegments;
       line.geometry.dispose();
-      const materials = Array.isArray(line.material) ? line.material : [line.material];
-      materials.forEach((material) => material.dispose());
+      disposeMaterials(line.material);
     }
   });
 }
@@ -416,7 +451,10 @@ async function loadObjectFromSource(source: ArrayBuffer | File): Promise<Object3
   const signature = new Uint8Array(buffer.slice(0, 4));
   const isThreeMF =
     identifier.endsWith('.3mf') ||
-    (signature[0] === 0x50 && signature[1] === 0x4b && signature[2] === 0x03 && signature[3] === 0x04);
+    (signature[0] === 0x50 &&
+      signature[1] === 0x4b &&
+      signature[2] === 0x03 &&
+      signature[3] === 0x04);
 
   if (isThreeMF) {
     const { ThreeMFLoader } = await import('three-stdlib');
@@ -470,9 +508,8 @@ function determineScale(size: Vector3): number {
 }
 
 function rebuildGrid(scene: Scene, currentGrid: GridHelper, bounds: Box3): GridHelper {
-  const existingMaterial = Array.isArray(currentGrid.material) ? currentGrid.material : [currentGrid.material];
   currentGrid.geometry.dispose();
-  existingMaterial.forEach((material) => (material as Material).dispose());
+  disposeMaterials(currentGrid.material);
   scene.remove(currentGrid);
 
   const size = bounds.getSize(new Vector3());
@@ -500,4 +537,15 @@ function countTriangles(group: Group): number {
     }
   });
   return total;
+}
+
+function toMaterialArray(material: Material | Material[] | undefined): Material[] {
+  if (!material) {
+    return [];
+  }
+  return Array.isArray(material) ? material : [material];
+}
+
+function disposeMaterials(material: Material | Material[] | undefined): void {
+  toMaterialArray(material).forEach((entry) => entry.dispose());
 }

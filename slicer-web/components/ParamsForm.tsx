@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 
 import {
@@ -8,7 +8,7 @@ import {
   MATERIAL_DENSITIES,
   type EstimateBreakdown,
   type Material,
-  type PrintParams
+  type PrintParams,
 } from '../lib/estimate';
 import { getEstimateWorkerHandle } from '../modules/estimate/workerClient';
 import { useViewerStore } from '../modules/store';
@@ -31,7 +31,7 @@ const FormSchema = z.object({
   kwhPrice: z.number().min(0),
   maintPerHour: z.number().min(0),
   margin: z.number().min(0).max(1),
-  filamentDiameter_mm: z.number().positive()
+  filamentDiameter_mm: z.number().positive(),
 });
 
 type FormValues = z.infer<typeof FormSchema>;
@@ -55,7 +55,7 @@ const DEFAULT_FORM_VALUES: FormState = {
   kwhPrice: DEFAULT_PRINT_PARAMS.kwhPrice.toString(),
   maintPerHour: DEFAULT_PRINT_PARAMS.maintPerHour.toString(),
   margin: DEFAULT_PRINT_PARAMS.margin.toString(),
-  filamentDiameter_mm: DEFAULT_PRINT_PARAMS.filamentDiameter_mm.toString()
+  filamentDiameter_mm: DEFAULT_PRINT_PARAMS.filamentDiameter_mm.toString(),
 };
 
 const PRESETS: Array<{
@@ -65,7 +65,7 @@ const PRESETS: Array<{
 }> = [
   { label: 'Qualidade Fina (0.12)', layerHeight_mm: 0.12, printSpeed_mm_s: 40 },
   { label: 'Padrão (0.20)', layerHeight_mm: 0.2, printSpeed_mm_s: 55 },
-  { label: 'Rápido (0.28)', layerHeight_mm: 0.28, printSpeed_mm_s: 70 }
+  { label: 'Rápido (0.28)', layerHeight_mm: 0.28, printSpeed_mm_s: 70 },
 ];
 
 export interface ParamsFormProps {
@@ -83,7 +83,7 @@ export interface OverrideMetrics {
 
 export function mergeBreakdownWithOverride(
   base: EstimateBreakdown | null,
-  override: OverrideMetrics | null | undefined
+  override: OverrideMetrics | null | undefined,
 ): EstimateBreakdown | null {
   if (!base) {
     return null;
@@ -98,7 +98,7 @@ export function mergeBreakdownWithOverride(
     costs: { ...base.costs },
     params: base.params,
     time_s: override.time_s,
-    filamentLen_mm: override.filamentLen_mm
+    filamentLen_mm: override.filamentLen_mm,
   };
 }
 
@@ -114,37 +114,40 @@ export function ParamsForm({
   onEstimateChange,
   onLoadingChange,
   onErrorChange,
-  initialParams
+  initialParams,
 }: ParamsFormProps) {
-  const mergedDefaults = useMemo(() => ({
-    ...DEFAULT_FORM_VALUES,
-    ...(initialParams?.infill !== undefined ? { infill: initialParams.infill.toString() } : {}),
-    ...(initialParams?.wallFactor !== undefined
-      ? { wallFactor: initialParams.wallFactor.toString() }
-      : {}),
-    ...(initialParams?.topBottomFactor !== undefined
-      ? { topBottomFactor: initialParams.topBottomFactor.toString() }
-      : {}),
-    ...(initialParams?.mvf !== undefined ? { mvf_mm3_s: initialParams.mvf.toString() } : {}),
-    ...(initialParams?.overhead !== undefined
-      ? { overhead: initialParams.overhead.toString() }
-      : {}),
-    ...(initialParams?.pricePerKg !== undefined
-      ? { pricePerKg: initialParams.pricePerKg.toString() }
-      : {}),
-    ...(initialParams?.powerW !== undefined ? { powerW: initialParams.powerW.toString() } : {}),
-    ...(initialParams?.kwhPrice !== undefined
-      ? { kwhPrice: initialParams.kwhPrice.toString() }
-      : {}),
-    ...(initialParams?.maintPerHour !== undefined
-      ? { maintPerHour: initialParams.maintPerHour.toString() }
-      : {}),
-    ...(initialParams?.margin !== undefined ? { margin: initialParams.margin.toString() } : {}),
-    ...(initialParams?.filamentDiameter_mm !== undefined
-      ? { filamentDiameter_mm: initialParams.filamentDiameter_mm.toString() }
-      : {}),
-    ...(initialParams?.material !== undefined ? { material: initialParams.material } : {})
-  }), [initialParams]);
+  const mergedDefaults = useMemo(
+    () => ({
+      ...DEFAULT_FORM_VALUES,
+      ...(initialParams?.infill !== undefined ? { infill: initialParams.infill.toString() } : {}),
+      ...(initialParams?.wallFactor !== undefined
+        ? { wallFactor: initialParams.wallFactor.toString() }
+        : {}),
+      ...(initialParams?.topBottomFactor !== undefined
+        ? { topBottomFactor: initialParams.topBottomFactor.toString() }
+        : {}),
+      ...(initialParams?.mvf !== undefined ? { mvf_mm3_s: initialParams.mvf.toString() } : {}),
+      ...(initialParams?.overhead !== undefined
+        ? { overhead: initialParams.overhead.toString() }
+        : {}),
+      ...(initialParams?.pricePerKg !== undefined
+        ? { pricePerKg: initialParams.pricePerKg.toString() }
+        : {}),
+      ...(initialParams?.powerW !== undefined ? { powerW: initialParams.powerW.toString() } : {}),
+      ...(initialParams?.kwhPrice !== undefined
+        ? { kwhPrice: initialParams.kwhPrice.toString() }
+        : {}),
+      ...(initialParams?.maintPerHour !== undefined
+        ? { maintPerHour: initialParams.maintPerHour.toString() }
+        : {}),
+      ...(initialParams?.margin !== undefined ? { margin: initialParams.margin.toString() } : {}),
+      ...(initialParams?.filamentDiameter_mm !== undefined
+        ? { filamentDiameter_mm: initialParams.filamentDiameter_mm.toString() }
+        : {}),
+      ...(initialParams?.material !== undefined ? { material: initialParams.material } : {}),
+    }),
+    [initialParams],
+  );
 
   const [formValues, setFormValues] = useState<FormState>(mergedDefaults);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormValues, string>>>({});
@@ -177,7 +180,7 @@ export function ParamsForm({
       kwhPrice: parseNumber(formValues.kwhPrice),
       maintPerHour: parseNumber(formValues.maintPerHour),
       margin: parseNumber(formValues.margin),
-      filamentDiameter_mm: parseNumber(formValues.filamentDiameter_mm)
+      filamentDiameter_mm: parseNumber(formValues.filamentDiameter_mm),
     };
     return { data: parsed, result: FormSchema.safeParse(parsed) };
   }, [formValues]);
@@ -200,6 +203,17 @@ export function ParamsForm({
   const pendingRef = useRef(false);
   const lastSignatureRef = useRef<string | null>(null);
   const lastVolumeRef = useRef<number | null>(null);
+
+  const updateLoading = useCallback(
+    (loading: boolean) => {
+      if (pendingRef.current === loading) {
+        return;
+      }
+      pendingRef.current = loading;
+      onLoadingChange?.(loading);
+    },
+    [onLoadingChange],
+  );
 
   useEffect(() => {
     const { result, data } = parsedResult;
@@ -233,8 +247,7 @@ export function ParamsForm({
     const performEstimate = async () => {
       try {
         const worker = getEstimateWorkerHandle();
-        const targetFlow_mm3_s =
-          data.layerHeight_mm * data.nozzleWidth_mm * data.printSpeed_mm_s;
+        const targetFlow_mm3_s = data.layerHeight_mm * data.nozzleWidth_mm * data.printSpeed_mm_s;
         const params: Partial<PrintParams> = {
           material: data.material,
           infill: data.infill,
@@ -248,7 +261,7 @@ export function ParamsForm({
           kwhPrice: data.kwhPrice,
           maintPerHour: data.maintPerHour,
           margin: data.margin,
-          filamentDiameter_mm: data.filamentDiameter_mm
+          filamentDiameter_mm: data.filamentDiameter_mm,
         };
 
         const response = await worker.proxy.estimate({ volumeModel_mm3, params });
@@ -273,20 +286,12 @@ export function ParamsForm({
     return () => {
       cancelled = true;
     };
-  }, [parsedResult, volumeModel_mm3]);
+  }, [parsedResult, updateLoading, volumeModel_mm3]);
 
   useEffect(() => {
     const merged = mergeBreakdownWithOverride(workerBreakdown, gcodeOverride);
     onEstimateChange(merged);
   }, [workerBreakdown, gcodeOverride, onEstimateChange]);
-
-  function updateLoading(loading: boolean) {
-    if (pendingRef.current === loading) {
-      return;
-    }
-    pendingRef.current = loading;
-    onLoadingChange?.(loading);
-  }
 
   function handleFieldChange<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setFormValues((current) => ({ ...current, [key]: value }));
@@ -296,7 +301,7 @@ export function ParamsForm({
     setFormValues((current) => ({
       ...current,
       layerHeight_mm: layerHeight.toString(),
-      printSpeed_mm_s: printSpeed.toString()
+      printSpeed_mm_s: printSpeed.toString(),
     }));
   }
 
@@ -320,7 +325,7 @@ export function ParamsForm({
         padding: '1.5rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '1.5rem'
+        gap: '1.5rem',
       }}
     >
       <header style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -342,7 +347,7 @@ export function ParamsForm({
                 border: '1px solid rgba(148, 163, 184, 0.4)',
                 background: 'rgba(15, 23, 42, 0.6)',
                 color: '#e2e8f0',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
             >
               {preset.label}
@@ -351,15 +356,14 @@ export function ParamsForm({
         </div>
       </header>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '1rem'
-      }}>
-        <Field
-          label="Material"
-          error={fieldErrors.material}
-        >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '1rem',
+        }}
+      >
+        <Field label="Material" error={fieldErrors.material}>
           <select
             value={formValues.material}
             onChange={(event) => handleFieldChange('material', event.target.value as Material)}
@@ -497,7 +501,7 @@ export function ParamsForm({
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
             gap: '0.75rem',
-            color: '#cbd5f5'
+            color: '#cbd5f5',
           }}
         >
           <div>
@@ -513,7 +517,7 @@ export function ParamsForm({
             <span style={{ fontSize: '1.125rem' }}>{targetFlowDisplay} mm³/s</span>
           </div>
         </div>
-        {gcodeError ?? generalError ? (
+        {(gcodeError ?? generalError) ? (
           <p style={{ color: '#f87171', margin: 0 }}>{gcodeError ?? generalError}</p>
         ) : (
           <p style={{ color: '#94a3b8', margin: 0 }}>
@@ -572,12 +576,12 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid rgba(148, 163, 184, 0.4)',
   borderRadius: '0.75rem',
   padding: '0.5rem 0.75rem',
-  color: '#f8fafc'
+  color: '#f8fafc',
 };
 
 const selectStyle: React.CSSProperties = {
   ...inputStyle,
-  appearance: 'none'
+  appearance: 'none',
 };
 
 function parseNumber(raw: string): number {

@@ -6,18 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "start:prod": "next start --hostname 127.0.0.1",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
-    "type-check": "tsc --project tsconfig.app.json --noEmit",
-    "typecheck": "pnpm run type-check",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "test": "vitest run",
-    "test:watch": "vitest watch",
-    "coverage": "vitest run --coverage",
+    "lint": "pnpm exec next lint && pnpm exec prettier -c \"{app,components,lib,modules,workers}/**/*.{ts,tsx}\" \"tests/**/*.ts?(x)\" \"styles/**/*.css\"",
+    "format": "pnpm exec prettier --write \"{app,components,lib,modules,workers}/**/*.{ts,tsx}\" \"tests/**/*.ts?(x)\" \"styles/**/*.css\"",
+    "typecheck": "pnpm exec tsc --project tsconfig.app.json --noEmit",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest watch",
     "e2e": "pnpm exec playwright test",
-    "e2e:install": "pnpm exec playwright install --with-deps",
+    "coverage": "pnpm exec vitest run --coverage",
     "prepare": "husky",
     "release": "release-please release"
   },
@@ -65,7 +60,8 @@
     "prettier": "^3.4.2",
     "release-please": "^16.14.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.0.4"
+    "vitest": "^3.0.4",
+    "@types/three": "^0.170.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

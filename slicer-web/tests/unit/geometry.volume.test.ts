@@ -57,32 +57,35 @@ async function bundleWorker(entryPath: string): Promise<string> {
         name: 'worker-alias',
         setup(build) {
           build.onResolve({ filter: /^three\/addons\/loaders\/BufferGeometryLoader\.js$/ }, () => ({
-            path: bufferGeometryLoaderPath
+            path: bufferGeometryLoaderPath,
           }));
-          build.onResolve({ filter: /^three\/examples\/jsm\/loaders\/BufferGeometryLoader\.js$/ }, () => ({
-            path: bufferGeometryLoaderPath
-          }));
+          build.onResolve(
+            { filter: /^three\/examples\/jsm\/loaders\/BufferGeometryLoader\.js$/ },
+            () => ({
+              path: bufferGeometryLoaderPath,
+            }),
+          );
           build.onResolve({ filter: /^three\/addons\/loaders\/STLLoader\.js$/ }, () => ({
-            path: stlLoaderPath
+            path: stlLoaderPath,
           }));
           build.onResolve({ filter: /^three\/examples\/jsm\/loaders\/STLLoader\.js$/ }, () => ({
-            path: stlLoaderPath
+            path: stlLoaderPath,
           }));
           build.onResolve({ filter: /^three\/addons\/loaders\/3MFLoader\.js$/ }, () => ({
-            path: threeMfLoaderPath
+            path: threeMfLoaderPath,
           }));
           build.onResolve({ filter: /^three\/examples\/jsm\/loaders\/3MFLoader\.js$/ }, () => ({
-            path: threeMfLoaderPath
+            path: threeMfLoaderPath,
           }));
           build.onResolve({ filter: /^three-stdlib$/ }, () => ({
-            path: threeStdlibStub
+            path: threeStdlibStub,
           }));
           build.onResolve({ filter: /^fflate$/ }, () => ({
-            path: fflateEntry
+            path: fflateEntry,
           }));
-        }
-      }
-    ]
+        },
+      },
+    ],
   });
 
   const prelude = `import { parentPort } from 'node:worker_threads';
@@ -120,7 +123,10 @@ globalThis.postMessage = endpoint.postMessage;
 const workerBundles = new Map<string, string>();
 
 const geometryWorkerUrl = new URL('../../workers/geometry.worker.ts', import.meta.url);
-workerBundles.set(geometryWorkerUrl.href, await bundleWorker(resolveWorkerEntry(geometryWorkerUrl)));
+workerBundles.set(
+  geometryWorkerUrl.href,
+  await bundleWorker(resolveWorkerEntry(geometryWorkerUrl)),
+);
 
 if (typeof globalThis.Worker === 'undefined') {
   class VitestWorker extends NodeWorker {
@@ -143,7 +149,7 @@ if (typeof globalThis.Worker === 'undefined') {
       const workerOptions: ConstructorParameters<typeof NodeWorker>[1] = {
         ...(options ?? {}),
         eval: true,
-        type: 'module'
+        type: 'module',
       };
 
       super(outputText, workerOptions);
@@ -157,7 +163,9 @@ if (typeof globalThis.Worker === 'undefined') {
         if (typeof listener === 'function') {
           listener({ data: value } as MessageEvent<unknown>);
         } else if (listener && typeof listener === 'object' && 'handleEvent' in listener) {
-          (listener.handleEvent as (event: MessageEvent<unknown>) => void)({ data: value } as MessageEvent<unknown>);
+          (listener.handleEvent as (event: MessageEvent<unknown>) => void)({
+            data: value,
+          } as MessageEvent<unknown>);
         }
       };
       this.#listeners.set(listener, handler);
@@ -176,7 +184,8 @@ if (typeof globalThis.Worker === 'undefined') {
     }
   }
 
-  (globalThis as unknown as { Worker: typeof Worker }).Worker = VitestWorker as unknown as typeof Worker;
+  (globalThis as unknown as { Worker: typeof Worker }).Worker =
+    VitestWorker as unknown as typeof Worker;
 }
 
 let workerHandle: WorkerHandle<GeometryWorkerApi> | undefined;
@@ -184,7 +193,7 @@ let workerHandle: WorkerHandle<GeometryWorkerApi> | undefined;
 function getGeometryWorkerHandle(): WorkerHandle<GeometryWorkerApi> {
   if (!workerHandle) {
     workerHandle = createWorkerHandle<GeometryWorkerApi>(
-      new URL('../../workers/geometry.worker.ts', import.meta.url)
+      new URL('../../workers/geometry.worker.ts', import.meta.url),
     );
   }
 
@@ -213,7 +222,7 @@ describe('geometry volume analysis', () => {
 
     const result = await proxy.analyzeGeometry({
       positions: positions.buffer,
-      indices: indices?.buffer
+      indices: indices?.buffer,
     });
 
     geometry.dispose();
@@ -232,13 +241,13 @@ describe('geometry volume analysis', () => {
     const fileBuffer = await fs.readFile(stlPath);
     const arrayBuffer = fileBuffer.buffer.slice(
       fileBuffer.byteOffset,
-      fileBuffer.byteOffset + fileBuffer.byteLength
+      fileBuffer.byteOffset + fileBuffer.byteLength,
     );
 
     const result = await proxy.analyzeGeometry({
       buffer: arrayBuffer,
       fileName: 'sample.stl',
-      mimeType: 'model/stl'
+      mimeType: 'model/stl',
     });
 
     expect(result.metrics.volume.absolute).toBeGreaterThan(0);

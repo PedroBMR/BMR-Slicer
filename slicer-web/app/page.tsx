@@ -15,7 +15,7 @@ export default function HomePage() {
           padding: '2.5rem',
           display: 'grid',
           gap: '2rem',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -32,7 +32,7 @@ export default function HomePage() {
                 borderRadius: '9999px',
                 background: '#38bdf8',
                 color: '#0f172a',
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               Open viewer
@@ -44,7 +44,7 @@ export default function HomePage() {
                 borderRadius: '9999px',
                 border: '1px solid rgba(148, 163, 184, 0.5)',
                 color: '#e2e8f0',
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               Review estimates
