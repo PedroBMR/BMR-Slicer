@@ -42,6 +42,7 @@ function isMeshObject(object: Object3D): object is Mesh {
 
 import { getMeshStatistics, sliceGeometry } from '../modules/geometry';
 import { generateLayers, type EstimateParameters } from '../modules/estimate';
+import { computeSignedVolume, summarizeGeometry, type GeometrySummary } from '../lib/geometry';
 
 export interface SliceWorkerRequest {
   positions: ArrayBuffer;
@@ -93,6 +94,17 @@ export interface ParseMeshResponse {
   };
 }
 
+export interface LoadMeshRequest {
+  buffer: ArrayBuffer;
+  fileName: string;
+  mimeType?: string;
+}
+
+export interface LoadMeshResponse extends GeometrySummary {
+  positions: ArrayBuffer;
+  indices?: ArrayBuffer;
+}
+
 export interface AnalyzeGeometryRequest {
   buffer?: ArrayBuffer;
   positions?: ArrayBuffer;
@@ -113,6 +125,80 @@ export interface AnalyzeGeometryResponse {
   positions: ArrayBuffer;
   indices?: ArrayBuffer;
   metrics: GeometryMetrics;
+}
+
+interface InternalGeometryAnalysis {
+  positions: Float32Array;
+  indices?: Uint32Array;
+  metrics: GeometryMetrics;
+  positionsBuffer: ArrayBuffer;
+  indicesBuffer?: ArrayBuffer;
+  transfers: ArrayBuffer[];
+}
+
+function analyzeGeometryPayload(payload: AnalyzeGeometryRequest): InternalGeometryAnalysis {
+  if (!payload.buffer && !payload.positions) {
+    throw new Error('Analyze request requires raw mesh data or typed arrays.');
+  }
+
+  const sourceGeometryResult = payload.buffer
+    ? createGeometryFromLoader(payload.buffer, {
+        buffer: payload.buffer,
+        fileName: payload.fileName ?? '',
+        mimeType: payload.mimeType,
+      })
+    : { geometry: geometryFromTypedArrays(payload.positions!, payload.indices), scale: 1 };
+
+  const {
+    geometry: normalizedGeometry,
+    boundingBox,
+    center,
+    size,
+  } = normalizeGeometry(sourceGeometryResult.geometry, sourceGeometryResult.scale);
+
+  const positionAttribute = normalizedGeometry.getAttribute('position');
+  if (!positionAttribute) {
+    throw new Error('Geometry is missing position data.');
+  }
+
+  const positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
+  normalizedGeometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
+
+  const indexAttribute = normalizedGeometry.getIndex();
+  let indices: Uint32Array | undefined;
+  if (indexAttribute) {
+    indices = toUint32Array(indexAttribute.array as ArrayLike<number>, indexAttribute.count);
+    normalizedGeometry.setIndex(new Uint32BufferAttribute(indices, 1));
+  }
+
+  const signedVolume = computeSignedVolume(positions, indices);
+
+  const metrics: GeometryMetrics = {
+    boundingBox: {
+      min: boundingBox.min.toArray() as [number, number, number],
+      max: boundingBox.max.toArray() as [number, number, number],
+    },
+    size: size.toArray() as [number, number, number],
+    triangleCount: indices ? indices.length / 3 : positions.length / 9,
+    volume: { signed: signedVolume, absolute: Math.abs(signedVolume) },
+    center: center.toArray() as [number, number, number],
+  };
+
+  const positionsBuffer = toArrayBuffer(positions.buffer);
+  const indicesBuffer = indices ? toArrayBuffer(indices.buffer) : undefined;
+  const transfers: ArrayBuffer[] = [positionsBuffer];
+  if (indicesBuffer) {
+    transfers.push(indicesBuffer);
+  }
+
+  return {
+    positions,
+    indices,
+    metrics,
+    positionsBuffer,
+    indicesBuffer,
+    transfers,
+  };
 }
 
 function detectThreeMf(buffer: ArrayBuffer, fileName?: string, mimeType?: string): boolean {
@@ -262,105 +348,40 @@ function toUint32Array(array: ArrayLike<number>, count: number): Uint32Array {
   return result;
 }
 
-function computeSignedVolume(positions: Float32Array, indices?: Uint32Array): number {
-  let volume = 0;
-  const v0 = new Vector3();
-  const v1 = new Vector3();
-  const v2 = new Vector3();
-  const cross = new Vector3();
-
-  if (indices && indices.length > 0) {
-    for (let i = 0; i < indices.length; i += 3) {
-      const i0 = indices[i] * 3;
-      const i1 = indices[i + 1] * 3;
-      const i2 = indices[i + 2] * 3;
-      v0.set(positions[i0], positions[i0 + 1], positions[i0 + 2]);
-      v1.set(positions[i1], positions[i1 + 1], positions[i1 + 2]);
-      v2.set(positions[i2], positions[i2 + 1], positions[i2 + 2]);
-      cross.copy(v1).cross(v2);
-      volume += v0.dot(cross);
-    }
-  } else {
-    for (let i = 0; i < positions.length; i += 9) {
-      v0.set(positions[i], positions[i + 1], positions[i + 2]);
-      v1.set(positions[i + 3], positions[i + 4], positions[i + 5]);
-      v2.set(positions[i + 6], positions[i + 7], positions[i + 8]);
-      cross.copy(v1).cross(v2);
-      volume += v0.dot(cross);
-    }
-  }
-
-  return volume / 6;
-}
-
 const api = {
   parseMesh(payload: ParseMeshRequest): ParseMeshResponse {
     const { geometry } = createGeometryFromLoader(payload.buffer, payload);
     return toParseResponse(geometry);
   },
-  analyzeGeometry(payload: AnalyzeGeometryRequest): AnalyzeGeometryResponse {
-    if (!payload.buffer && !payload.positions) {
-      throw new Error('Analyze request requires raw mesh data or typed arrays.');
-    }
-
-    const sourceGeometryResult = payload.buffer
-      ? createGeometryFromLoader(payload.buffer, {
-          buffer: payload.buffer,
-          fileName: payload.fileName ?? '',
-          mimeType: payload.mimeType,
-        })
-      : { geometry: geometryFromTypedArrays(payload.positions!, payload.indices), scale: 1 };
-
-    const {
-      geometry: normalizedGeometry,
-      boundingBox,
-      center,
-      size,
-    } = normalizeGeometry(sourceGeometryResult.geometry, sourceGeometryResult.scale);
-
-    const positionAttribute = normalizedGeometry.getAttribute('position');
-    if (!positionAttribute) {
-      throw new Error('Geometry is missing position data.');
-    }
-
-    const positions = new Float32Array(positionAttribute.array as ArrayLike<number>);
-    normalizedGeometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-
-    const indexAttribute = normalizedGeometry.getIndex();
-    let indices: Uint32Array | undefined;
-    if (indexAttribute) {
-      indices = toUint32Array(indexAttribute.array as ArrayLike<number>, indexAttribute.count);
-      normalizedGeometry.setIndex(new Uint32BufferAttribute(indices, 1));
-    }
-
-    const triangleCount = indices ? indices.length / 3 : positions.length / 9;
-    const signedVolume = computeSignedVolume(positions, indices);
-
-    const metrics: GeometryMetrics = {
-      boundingBox: {
-        min: boundingBox.min.toArray() as [number, number, number],
-        max: boundingBox.max.toArray() as [number, number, number],
-      },
-      size: size.toArray() as [number, number, number],
-      triangleCount,
-      volume: { signed: signedVolume, absolute: Math.abs(signedVolume) },
-      center: center.toArray() as [number, number, number],
-    };
-
-    const positionsBuffer = toArrayBuffer(positions.buffer);
-    const indicesBuffer = indices ? toArrayBuffer(indices.buffer) : undefined;
-    const transfers: ArrayBuffer[] = [positionsBuffer];
-    if (indicesBuffer) {
-      transfers.push(indicesBuffer);
-    }
+  loadMesh(payload: LoadMeshRequest): LoadMeshResponse {
+    const analysis = analyzeGeometryPayload({
+      buffer: payload.buffer,
+      fileName: payload.fileName,
+      mimeType: payload.mimeType,
+    });
+    const summary: GeometrySummary = summarizeGeometry(analysis.positions, analysis.indices);
 
     return transfer(
       {
-        positions: positionsBuffer,
-        indices: indicesBuffer,
-        metrics,
+        positions: analysis.positionsBuffer,
+        indices: analysis.indicesBuffer,
+        volume_mm3: summary.volume_mm3,
+        triangleCount: summary.triangleCount,
+        bbox: summary.bbox,
+        size: summary.size,
       },
-      transfers,
+      analysis.transfers,
+    );
+  },
+  analyzeGeometry(payload: AnalyzeGeometryRequest): AnalyzeGeometryResponse {
+    const analysis = analyzeGeometryPayload(payload);
+    return transfer(
+      {
+        positions: analysis.positionsBuffer,
+        indices: analysis.indicesBuffer,
+        metrics: analysis.metrics,
+      },
+      analysis.transfers,
     );
   },
   slice(payload: SliceWorkerRequest): SliceWorkerResponse {
