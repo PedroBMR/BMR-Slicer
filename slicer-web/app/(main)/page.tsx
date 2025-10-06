@@ -1,9 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { FileDrop, type FileDropResult } from '../../components/FileDrop';
 import { ModelViewer } from '../../components/ModelViewer';
+import { ParamsForm } from '../../components/ParamsForm';
+import { ResultsCard } from '../../components/ResultsCard';
+
+import type { EstimateBreakdown } from '../../lib/estimate';
 
 function formatNumber(value: number, fractionDigits = 2): string {
   return value.toLocaleString(undefined, {
@@ -14,6 +18,9 @@ function formatNumber(value: number, fractionDigits = 2): string {
 export default function MainPage() {
   const [mesh, setMesh] = useState<FileDropResult | null>(null);
   const [error, setError] = useState<string | undefined>();
+  const [estimate, setEstimate] = useState<EstimateBreakdown | null>(null);
+  const [estimateLoading, setEstimateLoading] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
 
   const handleGeometryLoaded = useCallback((result: FileDropResult) => {
     setMesh(result);
@@ -23,6 +30,14 @@ export default function MainPage() {
   const handleError = useCallback((message: string) => {
     setError(message);
   }, []);
+
+  useEffect(() => {
+    if (!mesh) {
+      setEstimate(null);
+      setEstimateLoading(false);
+      setEstimateError(null);
+    }
+  }, [mesh]);
 
   const metrics = mesh
     ? {
@@ -134,6 +149,21 @@ export default function MainPage() {
                 <MetricCard key={row.label} title={`BBox ${row.label}`} value={row.value} />
               ))}
             </div>
+          </section>
+          <section
+            style={{
+              display: 'grid',
+              gap: '1.5rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            }}
+          >
+            <ParamsForm
+              volumeModel_mm3={mesh.volume_mm3}
+              onEstimateChange={setEstimate}
+              onLoadingChange={setEstimateLoading}
+              onErrorChange={setEstimateError}
+            />
+            <ResultsCard breakdown={estimate} loading={estimateLoading} error={estimateError} />
           </section>
         </>
       ) : (
