@@ -1,8 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { transfer } from 'comlink';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
-import { FILE_TOO_LARGE_ERROR, MAX_FILE_SIZE_BYTES, useViewerStore } from '../modules/store';
+import { createWorkerHandle, type WorkerHandle } from '../lib/worker-factory';
+
+import type { BoundingBox, Vector3Tuple } from '../lib/geometry';
+import type { GeometryWorkerApi, LoadMeshResponse } from '../workers/geometry.worker';
 
 const SUPPORTED_EXTENSIONS = ['.stl', '.3mf'];
 const SUPPORTED_MIME_TYPES = new Set([
@@ -11,62 +15,148 @@ const SUPPORTED_MIME_TYPES = new Set([
   'application/vnd.ms-3mfdocument',
   'application/vnd.ms-package.3dmanufacturing-3dmodel',
 ]);
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
+export interface FileDropResult {
+  fileName: string;
+  positions: Float32Array;
+  indices?: Uint32Array;
+  volume_mm3: number;
+  triangleCount: number;
+  bbox: BoundingBox;
+  size: Vector3Tuple;
+}
+
+export interface FileDropProps {
+  onGeometryLoaded?: (result: FileDropResult) => void;
+  onError?: (message: string) => void;
+}
 
 function isSupportedFile(file: File): boolean {
   const lower = file.name.toLowerCase();
   if (SUPPORTED_EXTENSIONS.some((extension) => lower.endsWith(extension))) {
     return true;
   }
-  return file.type ? SUPPORTED_MIME_TYPES.has(file.type) : false;
+  if (file.type && SUPPORTED_MIME_TYPES.has(file.type)) {
+    return true;
+  }
+  return false;
 }
 
-export function FileDrop() {
-  const [highlighted, setHighlighted] = useState(false);
+export function FileDrop({ onGeometryLoaded, onError }: FileDropProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const workerRef = useRef<WorkerHandle<GeometryWorkerApi> | null>(null);
 
-  const loading = useViewerStore((state) => state.loading);
-  const error = useViewerStore((state) => state.error);
-  const loadFile = useViewerStore((state) => state.loadFile);
-  const disposeWorkers = useViewerStore((state) => state.disposeWorkers);
+  const [highlighted, setHighlighted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const resetInput = () => {
-    const input = inputRef.current;
-    if (input) {
-      input.value = '';
+  useEffect(() => {
+    const handle = createWorkerHandle<GeometryWorkerApi>(
+      new URL('../workers/geometry.worker.ts', import.meta.url),
+    );
+    workerRef.current = handle;
+    return () => {
+      workerRef.current = null;
+      handle.terminate();
+    };
+  }, []);
+
+  const acceptAttribute = useMemo(
+    () =>
+      [
+        '.stl',
+        '.3mf',
+        'model/stl',
+        'model/3mf',
+        'application/vnd.ms-3mfdocument',
+        'application/vnd.ms-package.3dmanufacturing-3dmodel',
+      ].join(','),
+    [],
+  );
+
+  const resetInput = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.value = '';
     }
-  };
+  }, []);
 
-  const handleFile = useCallback(
-    async (file: File | undefined) => {
-      if (!file) {
+  const handleFailure = useCallback(
+    (message: string) => {
+      setError(message);
+      onError?.(message);
+    },
+    [onError],
+  );
+
+  const processFile = useCallback(
+    async (file: File) => {
+      if (loading) {
         return;
       }
 
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        useViewerStore.setState({ error: FILE_TOO_LARGE_ERROR, loading: false });
+        handleFailure('File exceeds the 50 MB limit.');
         resetInput();
+        setLoading(false);
         return;
       }
 
       if (!isSupportedFile(file)) {
-        useViewerStore.setState({
-          error: 'Unsupported file type. Please upload an STL or 3MF file.',
-          loading: false,
-        });
+        handleFailure('Unsupported file type. Please upload an STL or 3MF model.');
         resetInput();
+        setLoading(false);
         return;
       }
 
+      if (!workerRef.current) {
+        handleFailure('Geometry worker is not ready.');
+        resetInput();
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError(undefined);
+
       try {
-        await loadFile(file);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        useViewerStore.setState({ error: message, loading: false });
+        const buffer = await file.arrayBuffer();
+        const response: LoadMeshResponse = await workerRef.current.proxy.loadMesh(
+          transfer(
+            {
+              buffer,
+              fileName: file.name,
+              mimeType: file.type || undefined,
+            },
+            [buffer],
+          ),
+        );
+
+        const positions = new Float32Array(response.positions);
+        const indices = response.indices ? new Uint32Array(response.indices) : undefined;
+
+        const result: FileDropResult = {
+          fileName: file.name,
+          positions,
+          indices,
+          volume_mm3: response.volume_mm3,
+          triangleCount: response.triangleCount,
+          bbox: response.bbox,
+          size: response.size,
+        };
+
+        onGeometryLoaded?.(result);
+        setError(undefined);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'Failed to process file.';
+        handleFailure(message);
+        return;
       } finally {
+        setLoading(false);
         resetInput();
       }
     },
-    [loadFile],
+    [handleFailure, loading, onGeometryLoaded, resetInput],
   );
 
   const handleFiles = useCallback(
@@ -74,19 +164,26 @@ export function FileDrop() {
       if (!files || files.length === 0) {
         return;
       }
-      if (loading) {
-        return;
-      }
-      await handleFile(files[0]);
+      await processFile(files[0]);
     },
-    [handleFile, loading],
+    [processFile],
   );
 
-  useEffect(() => {
-    return () => {
-      disposeWorkers();
-    };
-  }, [disposeWorkers]);
+  const baseStyles: CSSProperties = useMemo(
+    () => ({
+      border: `2px dashed ${highlighted ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)'}`,
+      borderRadius: '1rem',
+      padding: '2rem',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1rem',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'rgba(15, 23, 42, 0.5)',
+      transition: 'border-color 150ms ease, background 150ms ease',
+    }),
+    [highlighted],
+  );
 
   return (
     <div
@@ -100,22 +197,12 @@ export function FileDrop() {
         setHighlighted(false);
         void handleFiles(event.dataTransfer.files);
       }}
-      style={{
-        border: `2px dashed ${highlighted ? '#38bdf8' : 'rgba(148, 163, 184, 0.5)'}`,
-        borderRadius: '1rem',
-        padding: '2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.5)',
-      }}
+      style={baseStyles}
     >
-      <p style={{ fontSize: '1.125rem', fontWeight: 600 }}>Drop a mesh file to begin slicing</p>
-      <p style={{ color: '#94a3b8', maxWidth: '32rem', textAlign: 'center' }}>
-        Supports STL or 3MF files. The model will be processed in the browser and prepared for
-        slicing.
+      <p style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>Upload STL or 3MF</p>
+      <p style={{ color: '#94a3b8', maxWidth: '32rem', textAlign: 'center', margin: 0 }}>
+        Drag and drop a mesh file here or choose one from your computer. The model is parsed in a
+        Web Worker so the UI stays responsive while geometry metrics are computed.
       </p>
       <label
         style={{
@@ -126,21 +213,25 @@ export function FileDrop() {
           fontWeight: 600,
           cursor: loading ? 'not-allowed' : 'pointer',
           opacity: loading ? 0.7 : 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '0.5rem',
         }}
       >
-        {loading ? 'Loading…' : 'Choose file'}
+        {loading ? 'Processing…' : 'Choose file'}
         <input
           ref={inputRef}
-          disabled={loading}
           type="file"
-          accept=".stl,.3mf,model/stl,model/3mf,application/vnd.ms-3mfdocument,application/vnd.ms-package.3dmanufacturing-3dmodel"
+          accept={acceptAttribute}
+          disabled={loading}
           style={{ display: 'none' }}
           onChange={(event) => {
             void handleFiles(event.target.files);
           }}
         />
       </label>
-      {error ? <p style={{ color: '#f87171' }}>{error}</p> : null}
+      {loading ? <p style={{ color: '#94a3b8', margin: 0 }}>Parsing geometry…</p> : null}
+      {error ? <p style={{ color: '#f87171', margin: 0 }}>{error}</p> : null}
     </div>
   );
 }
