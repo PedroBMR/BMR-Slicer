@@ -221,7 +221,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       const parameters = get().parameters;
 
       const metricsVolume = payload.metrics?.volume.absolute;
-      const estimateResponsePromise =
+      const estimateBreakdownPromise =
         metricsVolume !== undefined ? computeEstimate(metricsVolume) : undefined;
 
       const {
@@ -252,9 +252,9 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       }
 
       const volumeModel_mm3 = metricsVolume ?? volume;
-      const estimateResponse =
-        estimateResponsePromise !== undefined
-          ? await estimateResponsePromise
+      const baseBreakdown =
+        estimateBreakdownPromise !== undefined
+          ? await estimateBreakdownPromise
           : await computeEstimate(volumeModel_mm3);
 
       const layers: LayerEstimate[] = rawLayers.map((layer: GeometryLayerSummary) => ({
@@ -269,7 +269,6 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         })),
       }));
 
-      const baseBreakdown = estimateResponse.breakdown;
       const override = get().gcodeOverride;
       const effectiveBreakdown: EstimateBreakdown = {
         ...baseBreakdown,

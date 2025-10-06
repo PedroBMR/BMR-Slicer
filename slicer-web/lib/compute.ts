@@ -2,9 +2,9 @@ import { transfer } from 'comlink';
 
 import { createWorkerHandle, type WorkerHandle } from './worker-factory';
 
-import type { PrintParams } from './estimate';
+import type { EstimateBreakdown, PrintParams } from './estimate';
 import type { EstimateParameters } from '../modules/estimate';
-import type { EstimateWorkerApi, EstimateWorkerResponse } from '../workers/estimate.worker';
+import type { EstimateWorkerApi } from '../workers/estimate.worker';
 import type { GeometryMetrics, GeometryWorkerApi } from '../workers/geometry.worker';
 
 let geometryHandle: WorkerHandle<GeometryWorkerApi> | undefined;
@@ -143,9 +143,9 @@ export async function computeGeometryLayers(
 export async function computeEstimate(
   volumeModel_mm3: number,
   params?: Partial<PrintParams>,
-): Promise<EstimateWorkerResponse> {
+): Promise<EstimateBreakdown> {
   const handle = getEstimateWorkerHandle();
-  return handle.proxy.estimate({ volumeModel_mm3, params });
+  return handle.proxy.estimateAll(volumeModel_mm3, params);
 }
 
 export function releaseGeometryCompute(): void {
