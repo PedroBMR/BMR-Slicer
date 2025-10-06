@@ -4,61 +4,50 @@ on:
   push:
     branches:
       - main
-      - master
   pull_request:
-    branches:
-      - main
-      - master
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: slicer-web
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          check-latest: true
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-store
-        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v3
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: slicer-web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run lint
+      - name: Lint
         run: pnpm lint
 
-      - name: Build project
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Build
         run: pnpm build
 
-      - name: Run vitest with coverage
-        run: pnpm exec vitest run --coverage
+      - name: Unit tests
+        run: pnpm test
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+        run: pnpm e2e:install
 
-      - name: Run Playwright tests
-        run: pnpm exec playwright test --headed=false
+      - name: End-to-end tests
+        run: pnpm e2e
 
       - name: Upload Playwright artifacts on failure
         if: failure()
@@ -66,7 +55,7 @@ jobs:
         with:
           name: playwright-artifacts
           path: |
-            playwright-report
-            test-results
-            **/*.zip
+            slicer-web/playwright-report
+            slicer-web/test-results
+            slicer-web/**/*.zip
           if-no-files-found: ignore

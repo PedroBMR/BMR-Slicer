@@ -1,0 +1,56 @@
+name: Repository Audit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  verify-core-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify core slicer-web files
+        run: |
+          set -eo pipefail
+          required_paths=(
+            "package.json"
+            "pnpm-lock.yaml"
+            "next.config.ts"
+            "tsconfig.json"
+            "tsconfig.app.json"
+            "tsconfig.test.json"
+            "vitest.config.ts"
+            "playwright.config.ts"
+            "README.md"
+            "app/layout.tsx"
+            "app/page.tsx"
+            "components"
+            "lib"
+            "modules"
+            "workers"
+            "public"
+            "styles"
+            "e2e"
+            "tests"
+          )
+
+          missing=0
+          for path in "${required_paths[@]}"; do
+            if [ ! -e "slicer-web/${path}" ]; then
+              echo "::error::Missing required path slicer-web/${path}"
+              missing=1
+            fi
+          done
+
+          if [ "${missing}" -ne 0 ]; then
+            echo "Core slicer-web files are missing."
+            exit 1
+          fi
+
+          echo "All required slicer-web files are present."
