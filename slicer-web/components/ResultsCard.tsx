@@ -24,15 +24,15 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
 
   const fileName = useViewerStore((state) => state.fileName);
   const geometrySource = useViewerStore((state) => state.geometrySource);
-  const { loadGcode, clearGcodeOverride, gcodeOverride, gcodeLoading, gcodeError } = useViewerStore(
-    (state) => ({
+  const { loadGcode, setGcodeEnabled, gcodeOverride, gcodeEnabled, gcodeLoading, gcodeError } =
+    useViewerStore((state) => ({
       loadGcode: state.loadGcode,
-      clearGcodeOverride: state.clearGcodeOverride,
+      setGcodeEnabled: state.setGcodeEnabled,
       gcodeOverride: state.gcodeOverride,
+      gcodeEnabled: state.gcodeEnabled,
       gcodeLoading: state.gcodeLoading,
       gcodeError: state.gcodeError,
-    }),
-  );
+    }));
 
   const { saveEstimate, saving } = useSavedEstimatesStore((state) => ({
     saveEstimate: state.saveEstimate,
@@ -138,8 +138,9 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
     if (gcodeLoading) {
       return;
     }
+    setGcodeEnabled(true);
     gcodeInputRef.current?.click();
-  }, [gcodeLoading]);
+  }, [gcodeLoading, setGcodeEnabled]);
 
   const handleGcodeChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -150,6 +151,17 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
       event.target.value = '';
     },
     [loadGcode],
+  );
+
+  const handleGcodeToggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const enabled = event.target.checked;
+      setGcodeEnabled(enabled);
+      if (enabled && !gcodeOverride) {
+        gcodeInputRef.current?.click();
+      }
+    },
+    [gcodeOverride, setGcodeEnabled],
   );
 
   const handleCopy = useCallback(async () => {
@@ -462,7 +474,8 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
 
   const hasBreakdown = Boolean(breakdown);
   const showGcodeControls = FEATURE_FLAGS.enableGcodeUpload && hasBreakdown;
-  const timeSourceNote = gcodeOverride ? 'Tempo estimado com base no G-code carregado.' : null;
+  const timeSourceNote =
+    gcodeEnabled && gcodeOverride ? 'Tempo estimado com base no G-code carregado.' : null;
 
   return (
     <section
@@ -580,65 +593,91 @@ export function ResultsCard({ breakdown, loading = false, error }: ResultsCardPr
           <input
             ref={gcodeInputRef}
             type="file"
-            accept=".gcode,text/plain"
+            accept=".gcode,.gco,.g,text/plain"
             style={{ display: 'none' }}
             onChange={handleGcodeChange}
           />
           <div
             style={{
               display: 'flex',
-              flexWrap: 'wrap',
-              gap: '0.75rem',
               alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '0.75rem',
+              flexWrap: 'wrap',
             }}
           >
-            <button
-              type="button"
-              onClick={handleGcodeUploadClick}
-              disabled={gcodeLoading}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <span style={{ fontWeight: 600 }}>Usar G-code</span>
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                Substitui as estimativas heurísticas com dados do arquivo carregado.
+              </span>
+            </div>
+            <label
               style={{
-                padding: '0.5rem 1.25rem',
-                borderRadius: '9999px',
-                border: '1px solid rgba(148, 163, 184, 0.4)',
-                background: gcodeLoading ? 'rgba(148, 163, 184, 0.2)' : '#38bdf8',
-                color: gcodeLoading ? '#94a3b8' : '#0f172a',
-                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
                 cursor: gcodeLoading ? 'not-allowed' : 'pointer',
               }}
             >
-              {gcodeLoading ? 'Processando...' : 'Upload G-code'}
-            </button>
-            {gcodeOverride ? (
-              <button
-                type="button"
-                onClick={clearGcodeOverride}
+              <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                {gcodeEnabled ? 'Ativo' : 'Desativado'}
+              </span>
+              <input
+                type="checkbox"
+                checked={gcodeEnabled}
+                onChange={handleGcodeToggle}
                 disabled={gcodeLoading}
+                style={{ width: '1.25rem', height: '1.25rem' }}
+              />
+            </label>
+          </div>
+          {gcodeEnabled ? (
+            <>
+              <div
                 style={{
-                  padding: '0.5rem 1.25rem',
-                  borderRadius: '9999px',
-                  border: '1px solid rgba(148, 163, 184, 0.4)',
-                  background: 'transparent',
-                  color: '#f8fafc',
-                  fontWeight: 600,
-                  cursor: gcodeLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  alignItems: 'center',
                 }}
               >
-                Usar estimativa heurística
-              </button>
-            ) : null}
-          </div>
-          {gcodeOverride ? (
-            <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>
-              <strong>{gcodeOverride.fileName}</strong>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <span>Tempo: {overrideTimeDisplay}</span>
-                <span>Filamento: {overrideFilamentDisplay}</span>
+                <button
+                  type="button"
+                  onClick={handleGcodeUploadClick}
+                  disabled={gcodeLoading}
+                  style={{
+                    padding: '0.5rem 1.25rem',
+                    borderRadius: '9999px',
+                    border: '1px solid rgba(148, 163, 184, 0.4)',
+                    background: gcodeLoading ? 'rgba(148, 163, 184, 0.2)' : '#38bdf8',
+                    color: gcodeLoading ? '#94a3b8' : '#0f172a',
+                    fontWeight: 600,
+                    cursor: gcodeLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {gcodeLoading ? 'Processando...' : 'Selecionar G-code'}
+                </button>
               </div>
-            </div>
+              {gcodeOverride ? (
+                <div style={{ color: '#cbd5f5', fontSize: '0.9rem' }}>
+                  <strong>{gcodeOverride.fileName}</strong>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <span>Tempo: {overrideTimeDisplay}</span>
+                    <span>Filamento: {overrideFilamentDisplay}</span>
+                  </div>
+                </div>
+              ) : (
+                <p style={{ margin: 0, color: '#94a3b8' }}>
+                  Selecione um arquivo G-code (.gcode, .gco, .g) para calcular tempo e filamento a
+                  partir do conteúdo real de impressão.
+                </p>
+              )}
+            </>
           ) : (
             <p style={{ margin: 0, color: '#94a3b8' }}>
-              Envie um arquivo G-code para substituir as estimativas heurísticas de tempo e
-              filamento.
+              Ative "Usar G-code" para carregar um arquivo e substituir as estimativas heurísticas de
+              tempo e filamento.
             </p>
           )}
           {gcodeError ? <p style={{ margin: 0, color: '#f87171' }}>{gcodeError}</p> : null}

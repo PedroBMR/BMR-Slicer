@@ -188,6 +188,7 @@ describe('useViewerStore worker integration', () => {
 
     const stateAfterLoad = useViewerStore.getState();
     expect(stateAfterLoad.gcodeOverride?.fileName).toBe('override.gcode');
+    expect(stateAfterLoad.gcodeEnabled).toBe(true);
     expect(stateAfterLoad.summary?.durationMinutes).toBeCloseTo(10);
     expect(stateAfterLoad.effectiveBreakdown?.time_s).toBe(600);
     expect(stateAfterLoad.effectiveBreakdown?.filamentLen_mm).toBe(12);
@@ -196,6 +197,7 @@ describe('useViewerStore worker integration', () => {
 
     const stateAfterClear = useViewerStore.getState();
     expect(stateAfterClear.gcodeOverride).toBeUndefined();
+    expect(stateAfterClear.gcodeEnabled).toBe(false);
     expect(stateAfterClear.summary?.durationMinutes).toBeCloseTo(2);
     expect(stateAfterClear.effectiveBreakdown?.time_s).toBe(120);
     expect(stateAfterClear.effectiveBreakdown?.filamentLen_mm).toBe(3);
