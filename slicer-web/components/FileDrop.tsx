@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { createWorkerHandle, type WorkerHandle } from '../lib/worker-factory';
 
 import type { BoundingBox, Vector3Tuple } from '../lib/geometry';
+import { FILE_TOO_LARGE_ERROR, MAX_FILE_SIZE_BYTES, useViewerStore } from '../modules/store';
 import type { GeometryWorkerApi, LoadMeshResponse } from '../workers/geometry.worker';
 
 const SUPPORTED_EXTENSIONS = ['.stl', '.3mf'];
@@ -15,7 +16,6 @@ const SUPPORTED_MIME_TYPES = new Set([
   'application/vnd.ms-3mfdocument',
   'application/vnd.ms-package.3dmanufacturing-3dmodel',
 ]);
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 export interface FileDropResult {
   fileName: string;
@@ -52,6 +52,10 @@ export function FileDrop({ onGeometryLoaded, onError }: FileDropProps) {
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.Worker !== 'function') {
+      return undefined;
+    }
+
     const handle = createWorkerHandle<GeometryWorkerApi>(
       new URL('../workers/geometry.worker.ts', import.meta.url),
     );
@@ -85,6 +89,7 @@ export function FileDrop({ onGeometryLoaded, onError }: FileDropProps) {
     (message: string) => {
       setError(message);
       onError?.(message);
+      useViewerStore.setState({ error: message, loading: false });
     },
     [onError],
   );
@@ -96,9 +101,8 @@ export function FileDrop({ onGeometryLoaded, onError }: FileDropProps) {
       }
 
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        handleFailure('File exceeds the 50 MB limit.');
+        handleFailure(FILE_TOO_LARGE_ERROR);
         resetInput();
-        setLoading(false);
         return;
       }
 
@@ -145,6 +149,7 @@ export function FileDrop({ onGeometryLoaded, onError }: FileDropProps) {
           size: response.size,
         };
 
+        useViewerStore.setState({ error: undefined });
         onGeometryLoaded?.(result);
         setError(undefined);
       } catch (cause) {
