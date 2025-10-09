@@ -9,7 +9,30 @@ import {
   Uint32BufferAttribute,
   Vector3,
 } from 'three';
-import { mergeBufferGeometries, STLLoader, ThreeMFLoader } from 'three-stdlib';
+type MergeBufferGeometriesFn = (
+  geometries: BufferGeometry[],
+  useGroups?: boolean,
+) => BufferGeometry | null;
+
+let loadersPromise:
+  | Promise<{
+      STLLoader: typeof import('three-stdlib').STLLoader;
+      ThreeMFLoader: typeof import('three-stdlib').ThreeMFLoader;
+      mergeBufferGeometries: MergeBufferGeometriesFn;
+    }>
+  | undefined;
+
+async function loadThreeLoaders() {
+  if (!loadersPromise) {
+    loadersPromise = import('three-stdlib').then((module) => ({
+      STLLoader: module.STLLoader,
+      ThreeMFLoader: module.ThreeMFLoader,
+      mergeBufferGeometries: module.mergeBufferGeometries as MergeBufferGeometriesFn,
+    }));
+  }
+
+  return loadersPromise;
+}
 
 const THREE_MF_MIME_TYPES = new Set([
   'model/3mf',
@@ -136,13 +159,15 @@ interface InternalGeometryAnalysis {
   transfers: ArrayBuffer[];
 }
 
-function analyzeGeometryPayload(payload: AnalyzeGeometryRequest): InternalGeometryAnalysis {
+async function analyzeGeometryPayload(
+  payload: AnalyzeGeometryRequest,
+): Promise<InternalGeometryAnalysis> {
   if (!payload.buffer && !payload.positions) {
     throw new Error('Analyze request requires raw mesh data or typed arrays.');
   }
 
   const sourceGeometryResult = payload.buffer
-    ? createGeometryFromLoader(payload.buffer, {
+    ? await createGeometryFromLoader(payload.buffer, {
         buffer: payload.buffer,
         fileName: payload.fileName ?? '',
         mimeType: payload.mimeType,
@@ -233,10 +258,11 @@ function extractThreeMfUnit(buffer: ArrayBuffer): string | undefined {
   return undefined;
 }
 
-function createGeometryFromLoader(
+async function createGeometryFromLoader(
   buffer: ArrayBuffer,
   request: ParseMeshRequest,
-): { geometry: BufferGeometry; scale: number } {
+): Promise<{ geometry: BufferGeometry; scale: number }> {
+  const { STLLoader, ThreeMFLoader, mergeBufferGeometries } = await loadThreeLoaders();
   const isThreeMF = detectThreeMf(buffer, request.fileName, request.mimeType);
   let scale = 1;
 
@@ -349,12 +375,17 @@ function toUint32Array(array: ArrayLike<number>, count: number): Uint32Array {
 }
 
 const api = {
-  parseMesh(payload: ParseMeshRequest): ParseMeshResponse {
-    const { geometry } = createGeometryFromLoader(payload.buffer, payload);
-    return toParseResponse(geometry);
+  async parseMesh(payload: ParseMeshRequest): Promise<ParseMeshResponse> {
+    const { geometry } = await createGeometryFromLoader(payload.buffer, payload);
+    const response = toParseResponse(geometry);
+    const transfers: ArrayBuffer[] = [response.positions.buffer as ArrayBuffer];
+    if (response.indices) {
+      transfers.push(response.indices.buffer as ArrayBuffer);
+    }
+    return transfer(response, transfers);
   },
-  loadMesh(payload: LoadMeshRequest): LoadMeshResponse {
-    const analysis = analyzeGeometryPayload({
+  async loadMesh(payload: LoadMeshRequest): Promise<LoadMeshResponse> {
+    const analysis = await analyzeGeometryPayload({
       buffer: payload.buffer,
       fileName: payload.fileName,
       mimeType: payload.mimeType,
@@ -373,8 +404,8 @@ const api = {
       analysis.transfers,
     );
   },
-  analyzeGeometry(payload: AnalyzeGeometryRequest): AnalyzeGeometryResponse {
-    const analysis = analyzeGeometryPayload(payload);
+  async analyzeGeometry(payload: AnalyzeGeometryRequest): Promise<AnalyzeGeometryResponse> {
+    const analysis = await analyzeGeometryPayload(payload);
     return transfer(
       {
         positions: analysis.positionsBuffer,
