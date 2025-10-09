@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "pnpm exec next lint && pnpm exec prettier -c \"{app,components,lib,modules,workers}/**/*.{ts,tsx}\" \"tests/**/*.ts?(x)\" \"styles/**/*.css\"",
+    "lint:staged": "pnpm exec lint-staged",
     "format": "pnpm exec prettier --write \"{app,components,lib,modules,workers}/**/*.{ts,tsx}\" \"tests/**/*.ts?(x)\" \"styles/**/*.css\"",
     "typecheck": "pnpm exec tsc --project tsconfig.app.json --noEmit",
     "test": "pnpm exec vitest run",
@@ -14,6 +15,7 @@
     "e2e": "pnpm exec playwright test",
     "coverage": "pnpm exec vitest run --coverage",
     "prepare": "husky",
+    "commitlint": "pnpm exec commitlint",
     "release": "release-please release"
   },
   "dependencies": {
