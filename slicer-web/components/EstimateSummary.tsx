@@ -9,6 +9,7 @@ export function EstimateSummary() {
   const summary = useViewerStore((state) => state.summary);
   const fileName = useViewerStore((state) => state.fileName) ?? 'slicer-report';
   const gcodeOverride = useViewerStore((state) => state.gcodeOverride);
+  const gcodeEnabled = useViewerStore((state) => state.gcodeEnabled);
 
   const metrics = useMemo(() => {
     if (!summary) {
@@ -55,7 +56,7 @@ export function EstimateSummary() {
         <div>
           <h2 style={{ margin: 0 }}>Print estimate</h2>
           <p style={{ margin: 0, color: '#94a3b8' }}>
-            {gcodeOverride
+            {gcodeEnabled && gcodeOverride
               ? 'Timing derived from uploaded G-code.'
               : 'Computed using adaptive slicing heuristics.'}
           </p>

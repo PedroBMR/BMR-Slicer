@@ -47,6 +47,7 @@ export interface ViewerStoreState {
   estimateBreakdown?: EstimateBreakdown;
   effectiveBreakdown?: EstimateBreakdown;
   gcodeOverride?: GcodeOverrideState;
+  gcodeEnabled: boolean;
   gcodeLoading: boolean;
   gcodeError?: string;
 }
@@ -63,6 +64,7 @@ export interface ViewerStoreActions {
   recompute: () => Promise<void>;
   loadGcode: (file: File) => Promise<void>;
   clearGcodeOverride: () => void;
+  setGcodeEnabled: (enabled: boolean) => void;
   reset: () => void;
   disposeWorkers: () => void;
 }
@@ -93,6 +95,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   estimateBreakdown: undefined,
   effectiveBreakdown: undefined,
   gcodeOverride: undefined,
+  gcodeEnabled: false,
   gcodeLoading: false,
   gcodeError: undefined,
 
@@ -190,6 +193,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       estimateBreakdown: undefined,
       effectiveBreakdown: undefined,
       gcodeOverride: undefined,
+      gcodeEnabled: false,
       gcodeLoading: false,
       gcodeError: undefined,
     });
@@ -269,14 +273,14 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         })),
       }));
 
-      const override = get().gcodeOverride;
+      const { gcodeOverride: override, gcodeEnabled } = get();
       const effectiveBreakdown: EstimateBreakdown = {
         ...baseBreakdown,
         costs: { ...baseBreakdown.costs },
         params: baseBreakdown.params,
       };
 
-      if (override) {
+      if (gcodeEnabled && override) {
         effectiveBreakdown.time_s = override.time_s;
         effectiveBreakdown.filamentLen_mm = override.filamentLen_mm;
       }
@@ -309,7 +313,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
   },
 
   async loadGcode(file: File) {
-    set({ gcodeLoading: true, gcodeError: undefined });
+    set({ gcodeLoading: true, gcodeError: undefined, gcodeEnabled: true });
 
     try {
       const fileName = file.name;
@@ -344,6 +348,11 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
         loadedAt: Date.now(),
       };
 
+      if (!get().gcodeEnabled) {
+        set({ gcodeLoading: false });
+        return;
+      }
+
       set((state) => {
         const summary = state.summary
           ? {
@@ -372,6 +381,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
         return {
           gcodeOverride: override,
+          gcodeEnabled: true,
           gcodeLoading: false,
           gcodeError: undefined,
           summary,
@@ -404,12 +414,21 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
 
       return {
         gcodeOverride: undefined,
+        gcodeEnabled: false,
         gcodeLoading: false,
         gcodeError: undefined,
         summary,
         effectiveBreakdown,
       };
     });
+  },
+
+  setGcodeEnabled(enabled: boolean) {
+    if (enabled) {
+      set({ gcodeEnabled: true, gcodeError: undefined });
+      return;
+    }
+    get().clearGcodeOverride();
   },
 
   reset() {
@@ -426,6 +445,7 @@ export const useViewerStore = create<ViewerStore>((set, get) => ({
       estimateBreakdown: undefined,
       effectiveBreakdown: undefined,
       gcodeOverride: undefined,
+      gcodeEnabled: false,
       gcodeLoading: false,
       gcodeError: undefined,
     });

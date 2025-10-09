@@ -1,6 +1,8 @@
 export interface GcodeEstimate {
   time_s: number;
   filamentLen_mm: number;
+  extrusionDistance_mm: number;
+  travelDistance_mm: number;
 }
 
 interface Vector3 {
@@ -48,6 +50,8 @@ export function parseAndEstimate(content: string): GcodeEstimate {
 
   let time_s = 0;
   let filamentLen_mm = 0;
+  let extrusionDistance_mm = 0;
+  let travelDistance_mm = 0;
 
   const lines = content.split(/\r?\n/);
   for (const rawLine of lines) {
@@ -145,6 +149,14 @@ export function parseAndEstimate(content: string): GcodeEstimate {
     const dz = nextPosition.z - position.z;
     const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
+    if (distance > 0) {
+      if (extrusionDelta > 0) {
+        extrusionDistance_mm += distance;
+      } else {
+        travelDistance_mm += distance;
+      }
+    }
+
     if (distance > 0 && feedRateMmPerMin && feedRateMmPerMin > 0) {
       const feedRateMmPerSec = feedRateMmPerMin / 60;
       if (feedRateMmPerSec > 0) {
@@ -161,5 +173,5 @@ export function parseAndEstimate(content: string): GcodeEstimate {
     position.z = nextPosition.z;
   }
 
-  return { time_s, filamentLen_mm };
+  return { time_s, filamentLen_mm, extrusionDistance_mm, travelDistance_mm };
 }
